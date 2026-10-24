@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ChefStock Pro - Gestão de Estoque</title>
 
-    <!-- Tags para PWA (Instalação no Telemóvel) -->
+    <!-- Tags para Favicon e PWA (Instalação no Telemóvel com Novo Ícone) -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#10b981">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3448/3448066.png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2855/2855365.png">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2855/2855365.png">
+    <link rel="shortcut icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2855/2855365.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -307,14 +309,15 @@
                 let score = 0;
 
                 if (normName === q) {
-                    score = 100;
+                    score = 100; // Match exato (com ou sem acento)
                 } else if (normName.startsWith(q)) {
-                    score = 90;
+                    score = 90;  // Começa com a palavra digitada
                 } else if (words.some(w => w.startsWith(q))) {
-                    score = 80;
+                    score = 80;  // Alguma palavra começa com o texto
                 } else if (normName.includes(q)) {
-                    score = 70;
+                    score = 70;  // Contém o trecho digitado
                 } else if (q.length >= 3) {
+                    // Verifica similaridade para erros de digitação / palavras semelhantes
                     const minWordDist = Math.min(...words.map(w => editDistance(q, w)), editDistance(q, normName));
                     const maxAllowed = q.length <= 4 ? 1 : 2;
                     if (minWordDist <= maxAllowed) {
@@ -624,7 +627,7 @@
                 state.products.push({
                     id: 'p' + Date.now(),
                     categoryId: catId,
-                    name: masterItem.name,
+                    name: masterItem.name, // Puxa sempre o nome oficial do banco de dados
                     qty: 0,
                     received: 0,
                     type: 'Unidade',
@@ -648,12 +651,14 @@
             if (!rawVal) return;
 
             const normVal = normalizeText(rawVal);
+            // 1. Verifica se já existe no banco de dados (ignorando acentos e maiúsculas)
             const exactMaster = state.masterData.find(m => normalizeText(m.name) === normVal);
             if (exactMaster) {
                 allocateExistingMasterToCat(catId, exactMaster);
                 return;
             }
 
+            // 2. Se não existe, abre o modal obrigando a escolher uma categoria/grupo do Catálogo Base
             openMandatoryMasterRegistrationModal(catId, rawVal);
         }
 
@@ -725,12 +730,14 @@
 
                 pushStateToUndo();
 
+                // Verifica se o nome editado já existe no catálogo
                 let masterObj = state.masterData.find(m => normalizeText(m.name) === normalizeText(finalName));
                 if (!masterObj) {
                     masterObj = { id: 'm' + Date.now(), group: selectedGroup, name: finalName };
                     state.masterData.push(masterObj);
                 }
 
+                // Adiciona no fornecedor desejado
                 const existsInSupplier = state.products.some(p => p.categoryId === catId && normalizeText(p.name) === normalizeText(masterObj.name));
                 if (!existsInSupplier) {
                     state.products.push({
@@ -751,6 +758,7 @@
             });
         }
 
+        // Fecha listas de sugestões ao clicar fora
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.cat-quick-add-wrapper')) {
                 document.querySelectorAll('.cat-sugg-box').forEach(el => el.classList.add('hidden'));
