@@ -1,0 +1,16 @@
+{
+  "name": "ChefStock Pro",
+  "short_name": "ChefStock",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#18181b",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3448/3448066.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
