@@ -47,6 +47,10 @@
             background-color: #ecfdf5 !important; 
             transform: scale(1.01);
         }
+        .prod-drag-over {
+            border-top: 2.5px solid #10b981 !important;
+            transform: translateY(2px);
+        }
         .dragging { opacity: 0.35; transform: scale(0.97); }
         .accordion-content { transition: max-height 0.3s ease-in-out; }
 
@@ -128,9 +132,9 @@
                                     <h2 class="text-sm font-extrabold text-zinc-900 flex items-center gap-2 uppercase tracking-wider">
                                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Catálogo Master
                                     </h2>
-                                    <p class="text-[11px] text-zinc-500 mt-0.5">Arraste para alocar em múltiplos locais.</p>
+                                    <p class="text-[10px] text-zinc-500 mt-0.5 leading-snug">Arraste para fornecedores ou entre grupos. <b>Segure no nome</b> para renomear.</p>
                                 </div>
-                                <button onclick="actionAddMasterItem()" class="text-xs bg-zinc-950 text-white px-3 py-2 rounded-xl font-bold hover:bg-zinc-800 transition flex items-center gap-1.5 shadow-xs">
+                                <button onclick="actionAddMasterItem()" class="text-xs bg-zinc-950 text-white px-3 py-2 rounded-xl font-bold hover:bg-zinc-800 transition flex items-center gap-1.5 shadow-xs shrink-0">
                                     <i class="fa-solid fa-plus text-emerald-400"></i> Novo Item
                                 </button>
                             </div>
@@ -283,8 +287,9 @@
             masterData: [],
             notas: [],
             emojis: [],
-            measureMemory: {}, // Memoriza a última unidade usada por produto (Kg, Caixa, Pacote, Unidade)
-            templates: [],     // Modelos de Pedidos Padrão salvos
+            measureMemory: {},
+            templates: [],
+            collapsedCats: {}, // Persistência de abas abertas/fechadas
             yearResetPending: false
         };
 
@@ -292,6 +297,8 @@
         let redoStack = [];
         let realtimeUnsubscribe = null;
         let isSavingToCloud = false;
+        let longPressTimer = null;
+        let touchDragState = { active: false, prodId: null, catId: null };
 
         let uiState = {
             currentTab: 'estoque',
@@ -302,6 +309,24 @@
             historySearch: '',
             collapsedCats: {}
         };
+
+        // --- PERSISTÊNCIA LOCAL DE ABAS DE FORNECEDORES ---
+        function loadCollapsedPrefs() {
+            try {
+                const raw = localStorage.getItem('chefstock_collapsed_cats');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    state.collapsedCats = { ...(state.collapsedCats || {}), ...parsed };
+                    uiState.collapsedCats = state.collapsedCats;
+                }
+            } catch (e) {}
+        }
+
+        function saveCollapsedPrefs() {
+            try {
+                localStorage.setItem('chefstock_collapsed_cats', JSON.stringify(state.collapsedCats || {}));
+            } catch (e) {}
+        }
 
         // --- INDICADOR DE CONEXÃO E SINCRONIZAÇÃO ---
         function setSyncIndicator(status) {
@@ -390,7 +415,6 @@
             return scored.map(s => s.item);
         }
 
-        // Retorna a unidade memorizada para um produto (ou 'Unidade' por padrão)
         function getRememberedMeasure(productName) {
             const key = normalizeText(productName);
             return (state.measureMemory && state.measureMemory[key]) ? state.measureMemory[key] : 'Unidade';
@@ -411,6 +435,7 @@
 
         async function init() {
             await loadData();
+            loadCollapsedPrefs();
             loadStacks();
             if (!state.categories || state.categories.length === 0) {
                 state.categories = JSON.parse(JSON.stringify(SEED_CATEGORIES));
@@ -444,6 +469,8 @@
             if (!state.emojis) state.emojis = [];
             if (!state.measureMemory) state.measureMemory = {};
             if (!state.templates) state.templates = [];
+            if (!state.collapsedCats) state.collapsedCats = {};
+            uiState.collapsedCats = state.collapsedCats;
             if (state.lastBackup !== undefined) delete state.lastBackup;
 
             state.products.forEach(p => {
@@ -455,7 +482,6 @@
             });
         }
 
-        // --- ESCUTA EM TEMPO REAL (MULTI-TELEMÓVEL) ---
         function startRealtimeListener() {
             if (realtimeUnsubscribe) return;
             try {
@@ -464,10 +490,10 @@
                     if (docSnap.exists && !docSnap.metadata.hasPendingWrites && !isSavingToCloud) {
                         state = docSnap.data();
                         sanitizeStateStructure();
+                        loadCollapsedPrefs();
                         localStorage.setItem('chefstock_pro_v3_data', JSON.stringify(state));
                         updateBadge();
                         setSyncIndicator('online');
-                        // Atualiza a tela se o utilizador não estiver digitando num input aberto
                         const activeTag = document.activeElement ? document.activeElement.tagName : '';
                         if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'SELECT') {
                             refreshCurrentTabView();
@@ -515,6 +541,8 @@
             showModal("Desfazer Ação", "<p class='text-zinc-700 text-sm'>Deseja voltar no tempo e <b>desfazer</b> a última alteração feita?</p>", "Sim, Desfazer", "bg-amber-500 text-zinc-950", () => {
                 redoStack.push(JSON.stringify(state)); 
                 state = JSON.parse(undoStack.pop());   
+                sanitizeStateStructure();
+                saveCollapsedPrefs();
                 saveStacks(); saveData(); 
                 renderHistorico(); renderEstoque(); renderLista(); renderNotas(); renderEmojis();
             });
@@ -525,6 +553,8 @@
             showModal("Refazer Ação", "<p class='text-zinc-700 text-sm'>Deseja avançar no tempo e <b>refazer</b> a ação que acabou de ser desfeita?</p>", "Sim, Refazer", "bg-emerald-500 text-zinc-950", () => {
                 undoStack.push(JSON.stringify(state)); 
                 state = JSON.parse(redoStack.pop());   
+                sanitizeStateStructure();
+                saveCollapsedPrefs();
                 saveStacks(); saveData(); 
                 renderHistorico(); renderEstoque(); renderLista(); renderNotas(); renderEmojis();
             });
@@ -553,6 +583,7 @@
         }
 
         async function saveData() {
+            saveCollapsedPrefs();
             localStorage.setItem('chefstock_pro_v3_data', JSON.stringify(state));
             updateBadge();
             if (!navigator.onLine) {
@@ -604,7 +635,16 @@
 
         function setCatFilter(catId) { uiState.activeCatFilter = catId; renderEstoque(); }
         function setMasterGroupFilter(gName) { uiState.activeMasterGroup = gName; renderMasterData(); }
-        function toggleCatCollapse(catId) { uiState.collapsedCats[catId] = !uiState.collapsedCats[catId]; renderEstoque(); }
+
+        // Alterna aba do fornecedor e salva permanentemente como o utilizador deixou
+        function toggleCatCollapse(catId) {
+            if (!state.collapsedCats) state.collapsedCats = {};
+            state.collapsedCats[catId] = !state.collapsedCats[catId];
+            uiState.collapsedCats = state.collapsedCats;
+            saveCollapsedPrefs();
+            saveData();
+            renderEstoque();
+        }
         
         function handleSearch(val) {
             uiState.searchQuery = val.trim();
@@ -621,7 +661,10 @@
                 <button onclick="closeModal()" class="px-4 py-2 text-xs font-bold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">Cancelar</button>
                 <button id="um-confirm" class="px-4 py-2 text-xs font-bold text-white rounded-xl transition ${confirmBgColor}">${confirmText}</button>
             `;
-            document.getElementById('um-confirm').onclick = () => { if (onConfirm() !== false) closeModal(); };
+            document.getElementById('um-confirm').onclick = () => {
+                const res = onConfirm();
+                if (res !== false && res !== 'KEEP_OPEN') closeModal();
+            };
             document.getElementById('u-modal').classList.remove('hidden');
         }
 
@@ -632,9 +675,172 @@
                 <button id="um-btn1" class="px-3 py-2.5 text-xs font-bold text-white rounded-xl transition shadow-xs flex-1 ${btn1Bg}">${btn1Text}</button>
                 <button id="um-btn2" class="px-3 py-2.5 text-xs font-bold text-white rounded-xl transition shadow-xs flex-1 ${btn2Bg}">${btn2Text}</button>
             `;
-            document.getElementById('um-btn1').onclick = () => { if (onBtn1() !== false) closeModal(); };
-            document.getElementById('um-btn2').onclick = () => { if (onBtn2() !== false) closeModal(); };
+            document.getElementById('um-btn1').onclick = () => { const r = onBtn1(); if (r !== false && r !== 'KEEP_OPEN') closeModal(); };
+            document.getElementById('um-btn2').onclick = () => { const r = onBtn2(); if (r !== false && r !== 'KEEP_OPEN') closeModal(); };
             document.getElementById('u-modal').classList.remove('hidden');
+        }
+
+        // --- RENOMEAÇÃO GLOBAL DE PRODUTO (ATUALIZA MASTER + FORNECEDORES + MODELOS + NOTAS) ---
+        function renameProductGlobally(oldName, rawNewName) {
+            const newName = (rawNewName || '').trim();
+            if (!newName || newName === oldName) return false;
+
+            pushStateToUndo();
+            const normOld = normalizeText(oldName);
+
+            // 1. Atualiza no Catálogo Master
+            state.masterData.forEach(m => {
+                if (normalizeText(m.name) === normOld) m.name = newName;
+            });
+
+            // 2. Atualiza em todas as listas de fornecedores
+            state.products.forEach(p => {
+                if (normalizeText(p.name) === normOld) p.name = newName;
+            });
+
+            // 3. Atualiza nos Modelos de Pedidos salvos
+            if (state.templates) {
+                state.templates.forEach(t => {
+                    t.items.forEach(it => {
+                        if (normalizeText(it.name) === normOld) it.name = newName;
+                    });
+                });
+            }
+
+            // 4. Atualiza memória de unidade de medida
+            if (state.measureMemory && state.measureMemory[normOld]) {
+                state.measureMemory[normalizeText(newName)] = state.measureMemory[normOld];
+            }
+
+            // 5. Atualiza menções @ nas notas
+            const escapedOld = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const rgxOld = new RegExp(`@${escapedOld}(?![\\wÀ-ÿ])`, 'gi');
+            state.notas.forEach(n => {
+                n.text = n.text.replace(rgxOld, `@${newName}`);
+            });
+
+            saveData();
+            renderEstoque();
+            renderLista();
+            return true;
+        }
+
+        // Pergunta primeiro ao clicar no nome na lista do fornecedor (evita clique sem querer)
+        function actionClickProductNameInSupplier(prodId) {
+            const prod = state.products.find(p => p.id === prodId);
+            if (!prod) return;
+
+            const bodyHtml = `
+                <div class="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-xs text-amber-950 leading-relaxed">
+                    <i class="fa-solid fa-circle-question text-amber-600 mr-1"></i>
+                    Você clicou no produto <b>"${prod.name}"</b>. Deseja fazer uma alteração no nome dele?
+                    <p class="text-[11px] text-amber-800 mt-1.5">A alteração atualizará automaticamente o <b>Catálogo Master</b> e todas as listas de fornecedores.</p>
+                </div>
+            `;
+
+            showModal("Alterar Nome do Produto?", bodyHtml, "Sim, Alterar Nome", "bg-zinc-950 hover:bg-zinc-800", () => {
+                openEditProductNameModal(prod.name);
+                return 'KEEP_OPEN';
+            });
+        }
+
+        function openEditProductNameModal(currentName) {
+            const bodyHtml = `
+                <div class="space-y-3">
+                    <p class="text-xs text-zinc-600">Digite o novo nome para <b>"${currentName}"</b> (será atualizado no Catálogo Master e em todas as listas):</p>
+                    <input type="text" id="global-rename-input" value="${currentName.replace(/"/g, '&quot;')}" class="w-full border border-zinc-300 p-2.5 rounded-xl font-bold text-zinc-900 outline-none focus:border-zinc-950">
+                </div>
+            `;
+
+            showModal("Renomear Produto", bodyHtml, "Salvar Novo Nome", "bg-emerald-600 hover:bg-emerald-700", () => {
+                const newVal = document.getElementById('global-rename-input').value.trim();
+                if (!newVal) return false;
+                renameProductGlobally(currentName, newVal);
+            });
+
+            setTimeout(() => {
+                const inp = document.getElementById('global-rename-input');
+                if (inp) { inp.focus(); inp.select(); }
+            }, 50);
+        }
+
+        // --- SEGURAR (LONG PRESS) NO NOME DO CATÁLOGO MASTER PARA RENOMEAR ---
+        function startMasterItemLongPress(e, masterId) {
+            clearMasterItemLongPress();
+            longPressTimer = setTimeout(() => {
+                const item = state.masterData.find(m => m.id === masterId);
+                if (!item) return;
+                if (navigator.vibrate) navigator.vibrate(40);
+                openEditProductNameModal(item.name);
+            }, 550);
+        }
+
+        function clearMasterItemLongPress() {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
+
+        // --- MUDAR ITEM DE CATEGORIA DENTRO DO CATÁLOGO MASTER (POR BOTÃO OU ARRASTANDO) ---
+        function actionChangeMasterItemGroup(masterId) {
+            const item = state.masterData.find(m => m.id === masterId);
+            if (!item) return;
+
+            const defaultGroups = SEED_MASTER.map(g => g.group);
+            const allGroups = [...new Set([...defaultGroups, ...state.masterData.map(m => m.group)])];
+            const opts = allGroups.map(g => `<option value="${g}" ${g === item.group ? 'selected' : ''}>${g}</option>`).join('') + `<option value="NOVO_GRUPO_MASTER">+ Criar Nova Categoria</option>`;
+
+            const bodyHtml = `
+                <div class="space-y-3">
+                    <p class="text-xs text-zinc-600">Mover <b>"${item.name}"</b> da categoria <b>${item.group}</b> para:</p>
+                    <select id="move-master-group-sel" onchange="document.getElementById('move-master-new-group').classList.toggle('hidden', this.value !== 'NOVO_GRUPO_MASTER')" class="border border-zinc-300 p-2.5 rounded-xl w-full font-bold text-zinc-900 outline-none focus:border-zinc-900">
+                        ${opts}
+                    </select>
+                    <input type="text" id="move-master-new-group" class="hidden border border-emerald-400 p-2.5 rounded-xl w-full bg-emerald-50 font-semibold text-zinc-900 outline-none" placeholder="Nome da nova categoria...">
+                </div>
+            `;
+
+            showModal("Mudar Categoria no Catálogo", bodyHtml, "Salvar Categoria", "bg-zinc-950 hover:bg-zinc-800", () => {
+                let targetGrp = document.getElementById('move-master-group-sel').value;
+                if (targetGrp === 'NOVO_GRUPO_MASTER') {
+                    targetGrp = document.getElementById('move-master-new-group').value.trim();
+                }
+                if (!targetGrp) return false;
+                pushStateToUndo();
+                item.group = targetGrp;
+                saveData();
+                renderEstoque();
+            });
+        }
+
+        function handleMasterGroupDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-target-hover');
+        }
+
+        function handleMasterGroupDragLeave(e) {
+            e.currentTarget.classList.remove('drag-target-hover');
+        }
+
+        function handleMasterGroupDrop(e, targetGroupName) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-target-hover');
+
+            const dataStr = e.dataTransfer.getData('text/plain');
+            if (!dataStr) return;
+            const [type, payload] = dataStr.split('|');
+
+            if (type === 'master') {
+                const item = state.masterData.find(m => m.id === payload);
+                if (item && item.group !== targetGroupName) {
+                    pushStateToUndo();
+                    item.group = targetGroupName;
+                    saveData();
+                    renderEstoque();
+                }
+            }
         }
 
         function switchTab(tabId) {
@@ -660,12 +866,25 @@
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
         }
 
-        function handleDragStart(e, type, idOrIndex) { e.dataTransfer.setData('text/plain', type + '|' + idOrIndex); setTimeout(() => e.target.classList.add('dragging'), 0); }
+        // --- DRAG & DROP DE CATEGORIAS, CATÁLOGO E REORDENAÇÃO INTERNA DE PRODUTOS ---
+        function handleDragStart(e, type, idOrIndex) {
+            clearMasterItemLongPress();
+            e.stopPropagation();
+            e.dataTransfer.setData('text/plain', type + '|' + idOrIndex);
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
         function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-target-hover'); }
         function handleDragLeave(e) { e.currentTarget.classList.remove('drag-target-hover'); }
-        function handleDragEnd(e) { e.target.classList.remove('dragging'); document.querySelectorAll('.cat-container').forEach(el => el.classList.remove('drag-target-hover')); }
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.cat-container, .master-group-container').forEach(el => el.classList.remove('drag-target-hover'));
+            document.querySelectorAll('.prod-card-item').forEach(el => el.classList.remove('prod-drag-over'));
+        }
+
         function handleDrop(e, targetCatId) {
-            e.preventDefault(); e.currentTarget.classList.remove('drag-target-hover');
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-target-hover');
             const dataStr = e.dataTransfer.getData('text/plain'); if(!dataStr) return;
             const [type, payload] = dataStr.split('|');
 
@@ -701,6 +920,87 @@
                     saveData(); renderEstoque();
                 }
             }
+            // Nota: se type === 'prod', ignoramos o drop em outra categoria para impedir que mude de lista
+        }
+
+        // Reordena produtos APENAS dentro da mesma categoria de fornecedor
+        function handleProdDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.add('prod-drag-over');
+        }
+
+        function handleProdDragLeave(e) {
+            e.currentTarget.classList.remove('prod-drag-over');
+        }
+
+        function handleProdDrop(e, targetProdId, targetCatId) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('prod-drag-over');
+
+            const dataStr = e.dataTransfer.getData('text/plain');
+            if (!dataStr) return;
+            const [type, draggedProdId] = dataStr.split('|');
+
+            if (type !== 'prod' || draggedProdId === targetProdId) return;
+            reorderProductWithinSameCat(draggedProdId, targetProdId, targetCatId);
+        }
+
+        function reorderProductWithinSameCat(draggedProdId, targetProdId, catId) {
+            const draggedProd = state.products.find(p => p.id === draggedProdId);
+            const targetProd = state.products.find(p => p.id === targetProdId);
+
+            // Garante que só organiza se ambos pertencerem à mesma lista de fornecedor
+            if (!draggedProd || !targetProd) return;
+            if (draggedProd.categoryId !== catId || targetProd.categoryId !== catId) return;
+
+            const fromIdx = state.products.findIndex(p => p.id === draggedProdId);
+            const toIdx = state.products.findIndex(p => p.id === targetProdId);
+            if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+
+            pushStateToUndo();
+            const [moved] = state.products.splice(fromIdx, 1);
+            const newToIdx = state.products.findIndex(p => p.id === targetProdId);
+            state.products.splice(fromIdx < toIdx ? newToIdx + 1 : newToIdx, 0, moved);
+
+            saveData();
+            renderEstoque();
+        }
+
+        // Suporte Touch (Telemóvel) para arrastar produtos para cima e para baixo na mesma lista
+        function startProdTouchDrag(e, prodId, catId) {
+            touchDragState = { active: true, prodId, catId };
+            const card = document.querySelector(`[data-prod-id="${prodId}"]`);
+            if (card) card.classList.add('dragging');
+        }
+
+        function moveProdTouchDrag(e) {
+            if (!touchDragState.active) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            document.querySelectorAll('.prod-card-item').forEach(el => el.classList.remove('prod-drag-over'));
+            const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetCard = elUnder ? elUnder.closest('.prod-card-item') : null;
+            if (targetCard && targetCard.dataset.catId === touchDragState.catId && targetCard.dataset.prodId !== touchDragState.prodId) {
+                targetCard.classList.add('prod-drag-over');
+            }
+        }
+
+        function endProdTouchDrag(e) {
+            if (!touchDragState.active) return;
+            const touch = e.changedTouches[0];
+            const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetCard = elUnder ? elUnder.closest('.prod-card-item') : null;
+
+            document.querySelectorAll('.prod-card-item').forEach(el => {
+                el.classList.remove('dragging', 'prod-drag-over');
+            });
+
+            if (targetCard && targetCard.dataset.catId === touchDragState.catId && targetCard.dataset.prodId !== touchDragState.prodId) {
+                reorderProductWithinSameCat(touchDragState.prodId, targetCard.dataset.prodId, touchDragState.catId);
+            }
+            touchDragState = { active: false, prodId: null, catId: null };
         }
 
         // --- ADIÇÃO POR COMANDO DE VOZ (MICROFONE) ---
@@ -923,7 +1223,6 @@
             });
         }
 
-        // Fecha listas de sugestões ao clicar fora
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.cat-quick-add-wrapper')) {
                 document.querySelectorAll('.cat-sugg-box').forEach(el => el.classList.add('hidden'));
@@ -1140,13 +1439,14 @@
                     catProducts = catProducts.filter(p => normalizeText(p.name).includes(normGlobalSearch));
                 }
 
-                const isCollapsed = uiState.collapsedCats[cat.id] && uiState.activeCatFilter === 'ALL' && !normGlobalSearch;
+                // Mantém o estado fechado/aberto exatamente como o utilizador deixou salvo
+                const isCollapsed = !!(state.collapsedCats && state.collapsedCats[cat.id]) && !normGlobalSearch;
                 const bgLight = `rgba(${parseInt(cat.color.slice(1, 3), 16)}, ${parseInt(cat.color.slice(3, 5), 16)}, ${parseInt(cat.color.slice(5, 7), 16)}, 0.12)`;
                 
                 html += `
                     <div class="cat-container bg-white rounded-2xl shadow-2xs border border-zinc-200/90 mb-3 overflow-visible transition-all duration-150" 
                          ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${cat.id}')">
-                        <div class="bg-white px-3.5 py-2.5 flex justify-between items-center border-b border-zinc-100 cursor-move group rounded-t-2xl" style="border-left: 5px solid ${cat.color}" draggable="true" ondragstart="handleDragStart(event, 'cat', ${realIndex})" ondragend="handleDragEnd(event)">
+                        <div class="bg-white px-3.5 py-2.5 flex justify-between items-center border-b border-zinc-100 cursor-move group ${isCollapsed ? 'rounded-2xl' : 'rounded-t-2xl'}" style="border-left: 5px solid ${cat.color}" draggable="true" ondragstart="handleDragStart(event, 'cat', ${realIndex})" ondragend="handleDragEnd(event)">
                             <div class="flex items-center gap-2 flex-1 cursor-pointer" onclick="toggleCatCollapse('${cat.id}')">
                                 <i class="fa-solid fa-grip-vertical text-zinc-300 text-xs"></i>
                                 <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color:${cat.color}"></span>
@@ -1194,12 +1494,30 @@
                     const mentionBadge = isMentioned ? `<button onclick="openNoteFor('${prod.name}')" class="ml-1.5 text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-black hover:bg-amber-100 transition" title="Ver anotação"><i class="fa-solid fa-at"></i> Nota</button>` : '';
 
                     html += `
-                        <div class="border rounded-xl px-3 py-2 transition-all ${isSelected ? (prod.urgent ? 'urgent-card' : 'shadow-2xs') : 'border-zinc-200/80 bg-zinc-50/60'}" ${isSelected && !prod.urgent ? `style="background-color: ${bgLight}; border-color:${cat.color};"` : ''}>
+                        <div class="prod-card-item border rounded-xl px-3 py-2 transition-all ${isSelected ? (prod.urgent ? 'urgent-card' : 'shadow-2xs') : 'border-zinc-200/80 bg-zinc-50/60'}"
+                             data-prod-id="${prod.id}"
+                             data-cat-id="${cat.id}"
+                             draggable="true"
+                             ondragstart="handleDragStart(event, 'prod', '${prod.id}')"
+                             ondragover="handleProdDragOver(event)"
+                             ondragleave="handleProdDragLeave(event)"
+                             ondrop="handleProdDrop(event, '${prod.id}', '${cat.id}')"
+                             ondragend="handleDragEnd(event)"
+                             ${isSelected && !prod.urgent ? `style="background-color: ${bgLight}; border-color:${cat.color};"` : ''}>
                             <div class="flex justify-between items-center gap-2">
-                                <div class="flex-1 flex items-center gap-2.5 min-w-0">
+                                <div class="flex-1 flex items-center gap-2 min-w-0">
+                                    <!-- Pega para Reordenar na Mesma Lista (PC e Telemóvel) -->
+                                    <span class="text-zinc-300 hover:text-zinc-600 cursor-grab active:cursor-grabbing px-0.5 py-1 touch-none"
+                                          title="Arraste para cima ou para baixo para organizar a lista"
+                                          ontouchstart="startProdTouchDrag(event, '${prod.id}', '${cat.id}')"
+                                          ontouchmove="moveProdTouchDrag(event)"
+                                          ontouchend="endProdTouchDrag(event)">
+                                        <i class="fa-solid fa-grip-lines text-xs"></i>
+                                    </span>
                                     <input type="checkbox" ${prod.selected ? 'checked' : ''} onchange="toggleProductSelection('${prod.id}')" class="w-4 h-4 accent-zinc-900 cursor-pointer shrink-0">
                                     <div class="min-w-0 flex-1 flex items-center">
-                                        <span class="font-bold text-zinc-900 text-sm truncate">${prod.name}</span>
+                                        <!-- Tocar no nome pergunta se deseja renomear globalmente -->
+                                        <span onclick="actionClickProductNameInSupplier('${prod.id}')" class="font-bold text-zinc-900 text-sm truncate cursor-pointer hover:underline" title="Toque para alterar o nome">${prod.name}</span>
                                         ${mentionBadge}
                                     </div>
                                 </div>
@@ -1258,7 +1576,18 @@
             for (const [groupName, items] of Object.entries(grouped)) {
                 if (uiState.activeMasterGroup !== 'ALL' && uiState.activeMasterGroup !== groupName) continue;
 
-                html += `<div class="border border-zinc-200/80 rounded-xl bg-zinc-50/50 overflow-hidden"><div class="bg-zinc-100/80 px-3 py-1.5 border-b border-zinc-200/60 font-extrabold text-[11px] uppercase tracking-wider text-zinc-600">${groupName}</div><div class="p-2.5 flex flex-wrap gap-1.5">`;
+                // Cada grupo do Catálogo Master aceita drop de itens para mudar de categoria arrastando
+                html += `
+                    <div class="master-group-container border border-zinc-200/80 rounded-xl bg-zinc-50/50 overflow-hidden transition-all"
+                         ondragover="handleMasterGroupDragOver(event)"
+                         ondragleave="handleMasterGroupDragLeave(event)"
+                         ondrop="handleMasterGroupDrop(event, '${groupName.replace(/'/g, "\\'")}')">
+                        <div class="bg-zinc-100/80 px-3 py-1.5 border-b border-zinc-200/60 font-extrabold text-[11px] uppercase tracking-wider text-zinc-600 flex justify-between items-center">
+                            <span>${groupName}</span>
+                            <span class="text-[10px] text-zinc-400">${items.length}</span>
+                        </div>
+                        <div class="p-2.5 flex flex-wrap gap-1.5">
+                `;
                 
                 items.forEach(item => {
                     const alloc = getMasterItemAllocation(item.name);
@@ -1280,9 +1609,20 @@
                     html += `
                         <div class="${pillClasses}" style="${pillStyle}" draggable="true" ondragstart="handleDragStart(event, 'master', '${item.id}')" ondragend="handleDragEnd(event)">
                             <i class="fa-solid fa-grip-vertical ${alloc.isAllocated ? 'text-white/70' : 'text-zinc-300'} mr-1.5 text-[9px]"></i>
-                            <span class="mr-1.5">${item.name}</span>
-                            <button onclick="actionMoveFromMasterToCat('${item.id}')" class="${alloc.isAllocated ? 'bg-black/20 hover:bg-black/40 text-white' : 'bg-zinc-900 hover:bg-emerald-500 text-emerald-400 hover:text-white'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
-                            <button onclick="actionDeleteMasterItem('${item.id}')" class="${alloc.isAllocated ? 'ml-0.5 text-white/75 hover:text-white' : 'ml-0.5 text-zinc-400 hover:text-rose-600'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                            <!-- Segurar em cima do nome abre a edição global do banco de dados -->
+                            <span class="mr-1.5 select-none"
+                                  title="Segure em cima do nome para renomear em todo o sistema"
+                                  onmousedown="startMasterItemLongPress(event, '${item.id}')"
+                                  onmouseup="clearMasterItemLongPress()"
+                                  onmouseleave="clearMasterItemLongPress()"
+                                  ontouchstart="startMasterItemLongPress(event, '${item.id}')"
+                                  ontouchend="clearMasterItemLongPress()"
+                                  ontouchmove="clearMasterItemLongPress()"
+                                  oncontextmenu="event.preventDefault(); clearMasterItemLongPress(); openEditProductNameModal('${item.name.replace(/'/g, "\\'")}')">${item.name}</span>
+                            <!-- Botão para mudar de categoria dentro do Catálogo Master -->
+                            <button onclick="actionChangeMasterItemGroup('${item.id}')" title="Mudar de categoria no Catálogo Master" class="${alloc.isAllocated ? 'bg-black/20 hover:bg-black/40 text-white' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'} w-5 h-5 rounded-full flex items-center justify-center mr-0.5 transition"><i class="fa-solid fa-folder-open text-[9px]"></i></button>
+                            <button onclick="actionMoveFromMasterToCat('${item.id}')" title="Alocar num fornecedor" class="${alloc.isAllocated ? 'bg-black/20 hover:bg-black/40 text-white' : 'bg-zinc-900 hover:bg-emerald-500 text-emerald-400 hover:text-white'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
+                            <button onclick="actionDeleteMasterItem('${item.id}')" title="Excluir do catálogo" class="${alloc.isAllocated ? 'ml-0.5 text-white/75 hover:text-white' : 'ml-0.5 text-zinc-400 hover:text-rose-600'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                         </div>
                     `;
                 });
@@ -1354,7 +1694,6 @@
                                 <h3 class="font-extrabold text-zinc-900 text-xs truncate">${cat.name}</h3>
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-zinc-200 text-zinc-600">${checkedCount}/${catItems.length} conf.</span>
                             </div>
-                            <!-- Ações Individuais do Fornecedor: WhatsApp e Finalizar Fornecedor -->
                             <div class="flex items-center gap-1.5 shrink-0">
                                 <button onclick="actionSendWhatsApp('${cat.id}')" title="Enviar apenas ${cat.name} para WhatsApp" class="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition shadow-2xs">
                                     <i class="fa-brands fa-whatsapp text-xs"></i> Enviar
@@ -1375,7 +1714,6 @@
                         <li class="px-3.5 py-2.5 transition-colors ${prod.checked ? 'checked-delivery-row' : (prod.urgent ? 'bg-rose-50/70' : '')}">
                             <div class="flex justify-between items-center gap-2">
                                 <div class="flex items-center gap-2.5 flex-1 min-w-0">
-                                    <!-- Botão de Check de Conferência na Entrega -->
                                     <button onclick="toggleDeliveryCheck('${prod.id}')" title="Marcar como conferido na entrega" class="w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition ${prod.checked ? 'bg-emerald-500 border-emerald-500 text-zinc-950 font-black' : 'bg-white border-zinc-300 text-transparent hover:border-zinc-500'}">
                                         <i class="fa-solid fa-check text-xs"></i>
                                     </button>
@@ -1419,7 +1757,6 @@
             if (prod) { prod.pending = false; prod.received = prod.qty; saveData(); renderLista(); }
         }
 
-        // Suporta finalizar TODOS os fornecedores (targetCatId = null) ou APENAS UM fornecedor específico
         function actionCheckDiscrepancies(targetCatId = null) {
             const discrepancies = [];
             const scopeName = targetCatId ? (state.categories.find(c => c.id === targetCatId)?.name || 'Fornecedor') : 'Todos os Fornecedores';
@@ -1485,7 +1822,6 @@
             const remaining = [];
 
             state.products.forEach(p => {
-                // Se estiver finalizando apenas 1 fornecedor, mantém os outros intactos
                 if (targetCatId && p.categoryId !== targetCatId) {
                     remaining.push(p);
                     return;
@@ -1563,7 +1899,6 @@
             return state.notas.some(n => normalizeText(n.text).includes(target));
         }
 
-        // Detecta quando o utilizador está digitando @ na nota e abre sugestões de produtos
         function handleNoteInputMention(textarea) {
             const box = document.getElementById('note-mention-box');
             if (!box) return;
@@ -1616,7 +1951,6 @@
             textarea.focus();
         }
 
-        // Destaca apenas o nome exato do produto mencionado (incluindo nomes compostos como @Tomate Cherry)
         function highlightMentionsInText(rawText) {
             const knownNames = [...new Set([
                 ...state.masterData.map(m => m.name),
@@ -1695,7 +2029,6 @@
             renderNotas();
         }
 
-        // Suporta enviar WhatsApp Geral (targetCatId = null) ou apenas de 1 fornecedor
         function actionSendWhatsApp(targetCatId = null) {
             const visibleItems = state.products.filter(p => p.qty > 0 && !p.pending && (!targetCatId || p.categoryId === targetCatId));
             if (visibleItems.length === 0) return;
@@ -1755,7 +2088,6 @@
                     </div>
                 </div>
 
-                <!-- Barra de Pesquisa no Histórico -->
                 <div class="relative mb-4">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
                     <input type="text" id="history-search-input" value="${(uiState.historySearch || '').replace(/"/g, '&quot;')}" oninput="handleHistorySearch(this.value)" placeholder="Pesquisar produto ou fornecedor no histórico..." class="w-full pl-9 pr-8 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-semibold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 shadow-2xs">
@@ -1905,7 +2237,7 @@
             if(p){
                 pushStateToUndo();
                 p.type = t;
-                rememberMeasure(p.name, t); // Memoriza a medida para este produto
+                rememberMeasure(p.name, t);
                 saveData();
             }
         }
