@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ChefStock Pro - Gestão de Estoque</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase App e Firestore SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #f4f4f5; 
+            color: #09090b;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .urgent-card { 
+            background-color: #fff1f2 !important; 
+            border-color: #f43f5e !important; 
+            border-width: 1.5px !important; 
+        }
+        
+        .drag-target-hover { 
+            outline: 2px dashed #10b981 !important; 
+            background-color: #ecfdf5 !important; 
+            transform: scale(1.01);
+        }
+        .dragging { opacity: 0.35; transform: scale(0.97); }
+        .accordion-content { transition: max-height 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="h-dvh flex flex-col overflow-hidden select-none bg-zinc-100 relative">
+
+    <!-- HEADER -->
+    <header class="bg-zinc-950 text-white px-4 py-3 flex justify-between items-center z-30 shadow-md shrink-0">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500 text-zinc-950 flex items-center justify-center font-black shadow-sm shadow-emerald-500/30">
+                <i class="fa-solid fa-utensils text-sm"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-extrabold tracking-tight leading-none">ChefStock <span class="text-emerald-400 font-semibold">Pro</span></h1>
+                <p class="text-[10px] text-zinc-400 font-medium mt-0.5">Kitchen Inventory System</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button onclick="switchTab('lista')" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition">
+                <i class="fa-solid fa-basket-shopping text-emerald-400"></i>
+                <span>Ativos:</span>
+                <span id="header-active-count" class="bg-emerald-500 text-zinc-950 px-1.5 py-0.2 rounded-full text-[11px] font-extrabold">0</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ÁREA PRINCIPAL -->
+    <main class="flex-1 overflow-y-auto pb-24" id="main-content">
+        <div class="max-w-7xl mx-auto p-3 sm:p-5">
+
+            <!-- VIEW 1: ESTOQUE & DADOS -->
+            <div id="view-estoque" class="block">
+                <div class="sticky top-0 z-20 bg-zinc-100/95 backdrop-blur-md pt-1 pb-3 space-y-2.5">
+                    <div class="flex items-center gap-2">
+                        <div class="flex lg:hidden bg-zinc-200/80 p-1 rounded-xl flex-1 border border-zinc-300/60">
+                            <button onclick="setEstoqueSubView('fornecedores')" id="subbtn-fornecedores" class="flex-1 py-2 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-1.5 bg-zinc-950 text-white shadow-xs">
+                                <i class="fa-solid fa-layer-group text-emerald-400"></i> Fornecedores
+                            </button>
+                            <button onclick="setEstoqueSubView('catalogo')" id="subbtn-catalogo" class="flex-1 py-2 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-1.5 text-zinc-600">
+                                <i class="fa-solid fa-database"></i> Catálogo Base
+                            </button>
+                        </div>
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
+                            <input type="text" id="global-search" oninput="handleSearch(this.value)" placeholder="Filtrar produto..." class="w-full pl-9 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 shadow-2xs">
+                            <button id="btn-clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 text-xs">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class=" lg:grid lg:grid-cols-12 lg:gap-6 items-start">
+                    <div id="panel-fornecedores" class="lg:col-span-7 block">
+                        <div id="categorias-container"></div>
+                    </div>
+                    <div id="panel-catalogo" class="lg:col-span-5 hidden lg:block lg:sticky lg:top-16">
+                        <div id="master-data-container" class="bg-white p-4 rounded-2xl border border-zinc-200/90 shadow-xs">
+                            <div class="flex justify-between items-center mb-3">
+                                <div>
+                                    <h2 class="text-sm font-extrabold text-zinc-900 flex items-center gap-2 uppercase tracking-wider">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Catálogo Master
+                                    </h2>
+                                    <p class="text-[11px] text-zinc-500 mt-0.5">Arraste para alocar em múltiplos locais.</p>
+                                </div>
+                                <button onclick="actionAddMasterItem()" class="text-xs bg-zinc-950 text-white px-3 py-2 rounded-xl font-bold hover:bg-zinc-800 transition flex items-center gap-1.5 shadow-xs">
+                                    <i class="fa-solid fa-plus text-emerald-400"></i> Novo Item
+                                </button>
+                            </div>
+                            <div id="master-data-list" class="space-y-3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: LISTA DE COMPRAS ATIVA -->
+            <div id="view-lista" class="space-y-4 hidden max-w-3xl mx-auto"></div>
+
+            <!-- VIEW 3: HISTÓRICO MENSAL -->
+            <div id="view-historico" class="space-y-4 hidden max-w-3xl mx-auto"></div>
+
+            <!-- VIEW 4: NOTAS -->
+            <div id="view-notas" class="space-y-4 hidden max-w-3xl mx-auto">
+                <div class="bg-white p-4 rounded-2xl shadow-2xs border border-zinc-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-sm font-extrabold text-zinc-900 uppercase tracking-wider">Bloco de Notas</h2>
+                    </div>
+                    
+                    <!-- Barra de Emojis Dinâmica -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2 border-b border-zinc-100">
+                        <span class="text-[10px] font-bold text-zinc-400 uppercase mr-1">Emojis:</span>
+                        <div id="emoji-list" class="flex items-center gap-1.5">
+                            <!-- Injetados dinamicamente via JS -->
+                        </div>
+                    </div>
+
+                    <textarea id="note-input" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-sm font-semibold text-zinc-800 focus:outline-none focus:border-zinc-900 transition" rows="3" placeholder="Digite sua nota. Ex: Pedi ao fornecedor para trazer @Tomate mais maduros..."></textarea>
+                    <div class="flex items-center gap-2 mt-2">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
+                            <input type="text" id="note-search" oninput="renderNotas()" placeholder="Filtrar notas..." class="w-full pl-8 py-2.5 bg-zinc-100 border border-transparent rounded-xl text-xs font-semibold focus:outline-none focus:border-zinc-300">
+                        </div>
+                        <button onclick="actionSaveNote()" class="bg-zinc-950 text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-zinc-800 transition shadow-sm">Salvar Nota</button>
+                    </div>
+                </div>
+                <div id="notes-list" class="space-y-3"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- BARRA GLOBAL FLUTUANTE DE MOVER EM MASSA (BULK MOVE) -->
+    <div id="global-bulk-bar" class="hidden fixed bottom-[76px] left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-4 py-3 rounded-2xl shadow-2xl z-40 flex items-center gap-4 w-11/12 max-w-sm justify-between border border-zinc-800">
+        <div class="text-xs font-bold flex items-center gap-2">
+            <span id="bulk-count-text" class="bg-emerald-500 text-zinc-950 px-2 py-0.5 rounded-full font-extrabold">0</span> selecionados
+        </div>
+        <div class="flex gap-2">
+            <button onclick="actionGlobalBulkMove()" class="bg-white text-zinc-950 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-zinc-200 transition"><i class="fa-solid fa-truck-moving mr-1 text-emerald-600"></i>Mover</button>
+            <button onclick="clearBulkSelection()" class="bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-rose-600 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
+    <!-- BARRA DE NAVEGAÇÃO INFERIOR -->
+    <nav class="fixed bottom-0 inset-x-0 bg-zinc-950 text-zinc-400 border-t border-zinc-800 flex justify-around items-center h-16 z-30 px-1 shadow-2xl">
+        <button onclick="switchTab('estoque')" id="tab-estoque" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-white transition-all">
+            <div class="relative flex items-center justify-center w-10 h-6 rounded-full bg-emerald-500/20 text-emerald-400" id="nav-pill-estoque">
+                <i class="fa-solid fa-boxes-stacked text-sm"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight">Estoque</span>
+        </button>
+
+        <button onclick="switchTab('lista')" id="tab-lista" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-zinc-400 transition-all relative">
+            <div class="relative flex items-center justify-center w-10 h-6 rounded-full" id="nav-pill-lista">
+                <i class="fa-solid fa-cart-shopping text-sm"></i>
+                <span id="badge-lista" class="hidden absolute -top-1.5 -right-2 bg-emerald-500 text-zinc-950 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border-2 border-zinc-950">0</span>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight">Lista Ativa</span>
+        </button>
+
+        <button onclick="switchTab('historico')" id="tab-historico" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-zinc-400 transition-all">
+            <div class="relative flex items-center justify-center w-10 h-6 rounded-full" id="nav-pill-historico">
+                <i class="fa-solid fa-chart-pie text-sm"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight">Histórico</span>
+        </button>
+
+        <button onclick="switchTab('notas')" id="tab-notas" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-zinc-400 transition-all">
+            <div class="relative flex items-center justify-center w-10 h-6 rounded-full" id="nav-pill-notas">
+                <i class="fa-solid fa-note-sticky text-sm"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight">Notas</span>
+        </button>
+    </nav>
+
+    <!-- UNIVERSAL MODAL SYSTEM -->
+    <div id="u-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-zinc-200 flex flex-col max-h-[90vh]">
+            <h3 id="um-title" class="text-base font-extrabold text-zinc-900 mb-3 border-b border-zinc-100 pb-2.5">Título</h3>
+            <div id="um-body" class="mb-5 text-zinc-700 text-sm space-y-3 overflow-y-auto no-scrollbar">
+                <!-- Content injected via JS -->
+            </div>
+            <div id="um-footer" class="flex justify-end gap-2 mt-auto pt-3 border-t border-zinc-100 flex-wrap">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO DO FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsm4VWu31m3HJ1dzbhdFWnh7gSsDXID54",
+            authDomain: "chefstock-pro-22b78.firebaseapp.com",
+            projectId: "chefstock-pro-22b78",
+            storageBucket: "chefstock-pro-22b78.firebasestorage.app",
+            messagingSenderId: "1069505098415",
+            appId: "1:1069505098415:web:1b96abc89a11c2e7d25a5a"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const SEED_CATEGORIES = [
+            { id: 'c1', name: 'Belave', color: '#ef4444', order: 1 },
+            { id: 'c2', name: 'Casa', color: '#f97316', order: 2 },
+            { id: 'c3', name: 'Lidl', color: '#eab308', order: 3 },
+            { id: 'c4', name: 'Recheio', color: '#22c55e', order: 4 },
+            { id: 'c5', name: 'Macro', color: '#06b6d4', order: 5 },
+            { id: 'c6', name: 'Pingo Doce / Continente', color: '#3b82f6', order: 6 },
+            { id: 'c7', name: 'Capuchos', color: '#a855f7', order: 7 },
+            { id: 'c8', name: 'Aromas', color: '#ec4899', order: 8 }
+        ];
+
+        const SEED_MASTER = [
+            { group: 'Legumes & Verduras', items: ['Tomate', 'Tomate Cherry', 'Alface', 'Rúcula', 'Espinafres', 'Grelos', 'Brócolos', 'Feijão Verde', 'Cenoura', 'Curgete', 'Cebola', 'Cebola Roxa', 'Alho', 'Pimento', 'Pimentos Padrón', 'Jalapeño', 'Paris'] },
+            { group: 'Fruta', items: ['Ananás', 'Abacate'] },
+            { group: 'Carnes & Peixe', items: ['Ovo', 'Frango', 'Carne Picada', 'Atum', 'Bacon', 'Fiambre', 'Presunto', 'Alheira', 'Chouriço', 'Salsicha', 'Pepperoni', 'Calabresa', 'Delícias do Mar', 'Anchovas'] },
+            { group: 'Laticínios & Queijos', items: ['Leite', 'Natas', 'Creme Azedo', 'Manteiga', 'Margarina', 'Ricotta', 'Mozzarella', 'Moz. Fresca', 'Parmesão', 'Emmental', 'Queijo de Cabra', 'Queijo de Ovelha', 'Gorgonzola'] },
+            { group: 'Massas & Cereais', items: ['Tortilhas', 'Massa', 'Massa s/ glúten', 'Cuscuz', 'Farinha', 'Fermento', 'Torradas'] },
+            { group: 'Conservas & Extras', items: ['Feijão', 'Milho', 'Azeitonas', 'Alcaparras', 'Frutos Secos', 'Mel'] },
+            { group: 'Ervas & Temperos', items: ['Manjericão', 'Manjerona', 'Cebolinho', 'Alecrim', 'Louro', 'Salsa', 'Coentros', 'Sal'] },
+            { group: 'Molhos', items: ['Molho Pesto', 'Molho de Alcaparras'] }
+        ];
+
+        let state = {
+            categories: [],
+            products: [], 
+            history: {},  
+            masterData: [],
+            notas: [],
+            emojis: [],
+            yearResetPending: false
+        };
+
+        let undoStack = [];
+        let redoStack = [];
+
+        let uiState = {
+            estoqueSubView: 'fornecedores',
+            activeCatFilter: 'ALL',
+            activeMasterGroup: 'ALL',
+            searchQuery: '',
+            collapsedCats: {}
+        };
+
+        // --- FUNÇÕES DE NORMALIZAÇÃO (SEM ACENTO) E SIMILARIDADE DE PALAVRAS ---
+        function normalizeText(str) {
+            return (str || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        }
+
+        function editDistance(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function findSimilarMasterItems(rawQuery) {
+            const q = normalizeText(rawQuery);
+            if (!q) return [];
+
+            const scored = [];
+            state.masterData.forEach(item => {
+                const normName = normalizeText(item.name);
+                const words = normName.split(/\s+/);
+                let score = 0;
+
+                if (normName === q) {
+                    score = 100; // Match exato (com ou sem acento)
+                } else if (normName.startsWith(q)) {
+                    score = 90;  // Começa com a palavra digitada
+                } else if (words.some(w => w.startsWith(q))) {
+                    score = 80;  // Alguma palavra começa com o texto
+                } else if (normName.includes(q)) {
+                    score = 70;  // Contém o trecho digitado
+                } else if (q.length >= 3) {
+                    // Verifica similaridade para erros de digitação / palavras semelhantes
+                    const minWordDist = Math.min(...words.map(w => editDistance(q, w)), editDistance(q, normName));
+                    const maxAllowed = q.length <= 4 ? 1 : 2;
+                    if (minWordDist <= maxAllowed) {
+                        score = 60 - (minWordDist * 10);
+                    }
+                }
+
+                if (score > 0) {
+                    scored.push({ item, score });
+                }
+            });
+
+            scored.sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
+            return scored.map(s => s.item);
+        }
+
+        function getMasterItemAllocation(itemName) {
+            const allocatedProds = state.products.filter(p => p.name === itemName);
+            const cats = allocatedProds.map(p => state.categories.find(c => c.id === p.categoryId)).filter(Boolean);
+            const uniqueColors = [...new Set(cats.map(c => c.color))];
+            if (uniqueColors.length === 0) return { isAllocated: false, colors: [] };
+            return { isAllocated: true, colors: uniqueColors };
+        }
+
+        async function init() {
+            await loadData();
+            loadStacks();
+            if (!state.categories || state.categories.length === 0) {
+                state.categories = JSON.parse(JSON.stringify(SEED_CATEGORIES));
+            }
+            if (!state.masterData || state.masterData.length === 0) {
+                let mId = 1;
+                SEED_MASTER.forEach(g => {
+                    g.items.forEach(itemName => {
+                        state.masterData.push({ id: 'm' + mId++, group: g.group, name: itemName });
+                    });
+                });
+            }
+            if (!state.emojis || state.emojis.length === 0) {
+                state.emojis = ['🍅','🧅','🥔','🥬','🥩','🍗','🐟','🥚','🧀','🧈','🥛','🍞','🧊','📦','✅','❌','⚠️','🚨','🚚'];
+            }
+
+            saveData();
+            checkYearResetLogic();
+            renderEstoque();
+            renderEmojis();
+            updateBadge();
+        }
+
+        function loadStacks() {
+            try {
+                let s = localStorage.getItem('chefstock_stacks');
+                if(s) { let parsed = JSON.parse(s); undoStack = parsed.undo || []; redoStack = parsed.redo || []; }
+            } catch(e){}
+        }
+
+        function saveStacks() {
+            localStorage.setItem('chefstock_stacks', JSON.stringify({
+                undo: undoStack.slice(-15),
+                redo: redoStack.slice(-15)
+            }));
+        }
+
+        function pushStateToUndo() {
+            if (state.lastBackup) delete state.lastBackup; 
+            undoStack.push(JSON.stringify(state));
+            redoStack = []; 
+            if (undoStack.length > 15) undoStack.shift();
+            saveStacks();
+        }
+
+        function actionUndo() {
+            if (undoStack.length === 0) return;
+            showModal("Desfazer Ação", "<p class='text-zinc-700 text-sm'>Deseja voltar no tempo e <b>desfazer</b> a última alteração feita?</p>", "Sim, Desfazer", "bg-amber-500 text-zinc-950", () => {
+                redoStack.push(JSON.stringify(state)); 
+                state = JSON.parse(undoStack.pop());   
+                saveStacks(); saveData(); 
+                renderHistorico(); renderEstoque(); renderLista(); renderNotas(); renderEmojis();
+            });
+        }
+
+        function actionRedo() {
+            if (redoStack.length === 0) return;
+            showModal("Refazer Ação", "<p class='text-zinc-700 text-sm'>Deseja avançar no tempo e <b>refazer</b> a ação que acabou de ser desfeita?</p>", "Sim, Refazer", "bg-emerald-500 text-zinc-950", () => {
+                undoStack.push(JSON.stringify(state)); 
+                state = JSON.parse(redoStack.pop());   
+                saveStacks(); saveData(); 
+                renderHistorico(); renderEstoque(); renderLista(); renderNotas(); renderEmojis();
+            });
+        }
+
+        async function loadData() {
+            try {
+                const docRef = db.collection("sistema").doc("estoque_principal");
+                const docSnap = await docRef.get();
+                if (docSnap.exists) {
+                    state = docSnap.data();
+                    localStorage.setItem('chefstock_pro_v3_data', JSON.stringify(state));
+                } else {
+                    const stored = localStorage.getItem('chefstock_pro_v3_data');
+                    if (stored) state = JSON.parse(stored);
+                }
+            } catch (e) {
+                const stored = localStorage.getItem('chefstock_pro_v3_data');
+                if (stored) state = JSON.parse(stored);
+            }
+
+            if (!state.history) state.history = {};
+            if (!state.masterData) state.masterData = [];
+            if (!state.categories) state.categories = [];
+            if (!state.products) state.products = [];
+            if (!state.notas) state.notas = [];
+            if (!state.emojis) state.emojis = [];
+            if (state.lastBackup !== undefined) delete state.lastBackup; 
+
+            state.products.forEach(p => { 
+                if (p.pending === undefined) p.pending = false; 
+                if (p.selected === undefined) p.selected = false;
+                if (p.received === undefined) p.received = p.qty; 
+                if (p.type === undefined) p.type = 'Unidade';
+            });
+        }
+
+        async function saveData() {
+            localStorage.setItem('chefstock_pro_v3_data', JSON.stringify(state));
+            updateBadge();
+            try { await db.collection("sistema").doc("estoque_principal").set(JSON.parse(JSON.stringify(state))); } catch (e) {}
+        }
+
+        function updateBadge() {
+            const listCount = state.products.filter(p => p.qty > 0 && !p.pending).length;
+            const badge = document.getElementById('badge-lista');
+            const headerCount = document.getElementById('header-active-count');
+            if (headerCount) headerCount.innerText = listCount;
+            if (listCount > 0) badge.classList.remove('hidden'); else badge.classList.add('hidden');
+            badge.innerText = listCount;
+        }
+
+        function setEstoqueSubView(subView) {
+            uiState.estoqueSubView = subView;
+            const pF = document.getElementById('panel-fornecedores');
+            const pC = document.getElementById('panel-catalogo');
+            const bF = document.getElementById('subbtn-fornecedores');
+            const bC = document.getElementById('subbtn-catalogo');
+
+            if (subView === 'fornecedores') {
+                pF.classList.remove('hidden'); pC.classList.add('hidden');
+                bF.className = "flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 bg-zinc-950 text-white shadow-xs";
+                bF.innerHTML = `<i class="fa-solid fa-layer-group text-emerald-400"></i> Fornecedores`;
+                bC.className = "flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 text-zinc-600";
+                bC.innerHTML = `<i class="fa-solid fa-database"></i> Catálogo Base`;
+            } else {
+                pF.classList.add('hidden'); pC.classList.remove('hidden');
+                bC.className = "flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 bg-zinc-950 text-white shadow-xs";
+                bC.innerHTML = `<i class="fa-solid fa-database text-emerald-400"></i> Catálogo Base`;
+                bF.className = "flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 text-zinc-600";
+                bF.innerHTML = `<i class="fa-solid fa-layer-group"></i> Fornecedores`;
+            }
+        }
+
+        function setCatFilter(catId) { uiState.activeCatFilter = catId; renderEstoque(); }
+        function setMasterGroupFilter(gName) { uiState.activeMasterGroup = gName; renderMasterData(); }
+        function toggleCatCollapse(catId) { uiState.collapsedCats[catId] = !uiState.collapsedCats[catId]; renderEstoque(); }
+        
+        function handleSearch(val) {
+            uiState.searchQuery = val.trim();
+            document.getElementById('btn-clear-search').classList.toggle('hidden', uiState.searchQuery.length === 0);
+            renderEstoque();
+        }
+        function clearSearch() { document.getElementById('global-search').value = ''; handleSearch(''); }
+
+        function closeModal() { document.getElementById('u-modal').classList.add('hidden'); }
+        function showModal(title, bodyHtml, confirmText, confirmBgColor, onConfirm) {
+            document.getElementById('um-title').innerHTML = title;
+            document.getElementById('um-body').innerHTML = bodyHtml;
+            document.getElementById('um-footer').innerHTML = `
+                <button onclick="closeModal()" class="px-4 py-2 text-xs font-bold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">Cancelar</button>
+                <button id="um-confirm" class="px-4 py-2 text-xs font-bold text-white rounded-xl transition ${confirmBgColor}">${confirmText}</button>
+            `;
+            document.getElementById('um-confirm').onclick = () => { if (onConfirm() !== false) closeModal(); };
+            document.getElementById('u-modal').classList.remove('hidden');
+        }
+
+        function showDecisionModal(title, bodyHtml, btn1Text, btn1Bg, onBtn1, btn2Text, btn2Bg, onBtn2) {
+            document.getElementById('um-title').innerHTML = title;
+            document.getElementById('um-body').innerHTML = bodyHtml;
+            document.getElementById('um-footer').innerHTML = `
+                <button id="um-btn1" class="px-3 py-2.5 text-xs font-bold text-white rounded-xl transition shadow-xs flex-1 ${btn1Bg}">${btn1Text}</button>
+                <button id="um-btn2" class="px-3 py-2.5 text-xs font-bold text-white rounded-xl transition shadow-xs flex-1 ${btn2Bg}">${btn2Text}</button>
+            `;
+            document.getElementById('um-btn1').onclick = () => { if (onBtn1() !== false) closeModal(); };
+            document.getElementById('um-btn2').onclick = () => { if (onBtn2() !== false) closeModal(); };
+            document.getElementById('u-modal').classList.remove('hidden');
+        }
+
+        function switchTab(tabId) {
+            ['estoque', 'lista', 'historico', 'notas'].forEach(id => {
+                document.getElementById(`tab-${id}`).classList.replace('text-white', 'text-zinc-400');
+                document.getElementById(`nav-pill-${id}`).classList.remove('bg-emerald-500/20', 'text-emerald-400');
+                document.getElementById(`view-${id}`).classList.add('hidden');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.replace('text-zinc-400', 'text-white');
+            document.getElementById(`nav-pill-${tabId}`).classList.add('bg-emerald-500/20', 'text-emerald-400');
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            if (tabId === 'estoque') renderEstoque();
+            if (tabId === 'lista') renderLista();
+            if (tabId === 'historico') renderHistorico();
+            if (tabId === 'notas') { renderNotas(); renderEmojis(); }
+        }
+
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16) || 0, g = parseInt(hex.slice(3, 5), 16) || 0, b = parseInt(hex.slice(5, 7), 16) || 0;
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function handleDragStart(e, type, idOrIndex) { e.dataTransfer.setData('text/plain', type + '|' + idOrIndex); setTimeout(() => e.target.classList.add('dragging'), 0); }
+        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-target-hover'); }
+        function handleDragLeave(e) { e.currentTarget.classList.remove('drag-target-hover'); }
+        function handleDragEnd(e) { e.target.classList.remove('dragging'); document.querySelectorAll('.cat-container').forEach(el => el.classList.remove('drag-target-hover')); }
+        function handleDrop(e, targetCatId) {
+            e.preventDefault(); e.currentTarget.classList.remove('drag-target-hover');
+            const dataStr = e.dataTransfer.getData('text/plain'); if(!dataStr) return;
+            const [type, payload] = dataStr.split('|');
+
+            if (type === 'master') {
+                const item = state.masterData.find(m => m.id === payload);
+                if (item) {
+                    const exists = state.products.find(p => p.name === item.name && p.categoryId === targetCatId);
+                    if (!exists) {
+                        pushStateToUndo();
+                        state.products.push({ id: 'p' + Date.now(), categoryId: targetCatId, name: item.name, qty: 0, received: 0, type: 'Unidade', urgent: false, pending: false, selected: false });
+                    }
+                    saveData(); renderEstoque();
+                }
+            } else if (type === 'cat') {
+                const dragIndex = parseInt(payload); const targetIndex = state.categories.findIndex(c => c.id === targetCatId);
+                if (dragIndex !== targetIndex && targetIndex !== -1) {
+                    pushStateToUndo();
+                    const catArr = state.categories.sort((a,b) => a.order - b.order);
+                    const movedItem = catArr.splice(dragIndex, 1)[0];
+                    catArr.splice(targetIndex, 0, movedItem);
+                    catArr.forEach((c, i) => c.order = i); state.categories = catArr;
+                    saveData(); renderEstoque();
+                }
+            }
+        }
+
+        // --- ADIÇÃO POR DIGITAÇÃO INTELIGENTE DENTRO DO FORNECEDOR ---
+        function handleCatQuickInput(catId, rawValue) {
+            const box = document.getElementById(`cat-sugg-${catId}`);
+            if (!box) return;
+
+            const trimmed = rawValue.trim();
+            if (!trimmed) {
+                box.classList.add('hidden');
+                box.innerHTML = '';
+                return;
+            }
+
+            const matches = findSimilarMasterItems(trimmed).slice(0, 6);
+            const exactMatch = state.masterData.find(m => normalizeText(m.name) === normalizeText(trimmed));
+
+            let html = '';
+            if (matches.length > 0) {
+                matches.forEach(m => {
+                    const alreadyInThisCat = state.products.some(p => p.categoryId === catId && normalizeText(p.name) === normalizeText(m.name));
+                    html += `
+                        <button type="button" onclick="selectMasterSuggestionForCat('${catId}', '${m.id}')" class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center justify-between border-b border-zinc-100 last:border-0 transition">
+                            <div>
+                                <span class="font-bold text-zinc-900">${m.name}</span>
+                                <span class="text-[10px] text-zinc-400 ml-1.5 font-semibold">(${m.group})</span>
+                            </div>
+                            ${alreadyInThisCat 
+                                ? `<span class="text-[10px] font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Já na lista</span>` 
+                                : `<span class="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+ Puxar</span>`
+                            }
+                        </button>
+                    `;
+                });
+            }
+
+            if (!exactMatch) {
+                html += `
+                    <button type="button" onclick="submitCatQuickAdd('${catId}')" class="w-full text-left px-3 py-2.5 text-xs bg-zinc-950 text-white hover:bg-zinc-800 flex items-center justify-between transition">
+                        <span class="truncate pr-2"><i class="fa-solid fa-plus text-emerald-400 mr-1.5"></i>Cadastrar <b>"${trimmed}"</b> no Catálogo...</span>
+                        <span class="text-[10px] bg-emerald-500 text-zinc-950 font-extrabold px-2 py-0.5 rounded-full shrink-0">Novo</span>
+                    </button>
+                `;
+            }
+
+            box.innerHTML = html;
+            box.classList.remove('hidden');
+        }
+
+        function selectMasterSuggestionForCat(catId, masterId) {
+            const masterItem = state.masterData.find(m => m.id === masterId);
+            if (!masterItem) return;
+            allocateExistingMasterToCat(catId, masterItem);
+        }
+
+        function allocateExistingMasterToCat(catId, masterItem) {
+            const existingInCat = state.products.find(p => p.categoryId === catId && normalizeText(p.name) === normalizeText(masterItem.name));
+            pushStateToUndo();
+            if (!existingInCat) {
+                state.products.push({
+                    id: 'p' + Date.now(),
+                    categoryId: catId,
+                    name: masterItem.name, // Puxa sempre o nome oficial do banco de dados
+                    qty: 0,
+                    received: 0,
+                    type: 'Unidade',
+                    urgent: false,
+                    pending: false,
+                    selected: false
+                });
+            }
+            const input = document.getElementById(`cat-input-${catId}`);
+            if (input) input.value = '';
+            const sugg = document.getElementById(`cat-sugg-${catId}`);
+            if (sugg) sugg.classList.add('hidden');
+            saveData();
+            renderEstoque();
+        }
+
+        function submitCatQuickAdd(catId) {
+            const input = document.getElementById(`cat-input-${catId}`);
+            if (!input) return;
+            const rawVal = input.value.trim();
+            if (!rawVal) return;
+
+            const normVal = normalizeText(rawVal);
+            // 1. Verifica se já existe no banco de dados (ignorando acentos e maiúsculas)
+            const exactMaster = state.masterData.find(m => normalizeText(m.name) === normVal);
+            if (exactMaster) {
+                allocateExistingMasterToCat(catId, exactMaster);
+                return;
+            }
+
+            // 2. Se não existe, abre o modal obrigando a escolher uma categoria/grupo do Catálogo Base
+            openMandatoryMasterRegistrationModal(catId, rawVal);
+        }
+
+        function openMandatoryMasterRegistrationModal(catId, typedProductName) {
+            const supplier = state.categories.find(c => c.id === catId);
+            const supplierName = supplier ? supplier.name : 'Fornecedor';
+            const defaultGroups = SEED_MASTER.map(g => g.group);
+            const currentGroups = [...new Set([...defaultGroups, ...state.masterData.map(m => m.group)])];
+
+            let opts = `<option value="" disabled selected>Selecione uma categoria do catálogo...</option>`;
+            opts += currentGroups.map(g => `<option value="${g}">${g}</option>`).join('');
+            opts += `<option value="NOVO_GRUPO_OBRIGATORIO">+ Criar Nova Categoria no Catálogo</option>`;
+
+            const similarItems = findSimilarMasterItems(typedProductName).slice(0, 3);
+            let similarHtml = '';
+            if (similarItems.length > 0) {
+                similarHtml = `
+                    <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-xl">
+                        <p class="text-[11px] font-extrabold text-amber-900 mb-1.5"><i class="fa-solid fa-magnifying-glass mr-1"></i>Itens semelhantes já no catálogo (toque para usar):</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${similarItems.map(sim => `
+                                <button type="button" onclick="closeModal(); selectMasterSuggestionForCat('${catId}', '${sim.id}')" class="text-xs bg-white border border-amber-300 text-amber-950 px-2.5 py-1 rounded-full font-bold hover:bg-amber-100 transition">
+                                    ${sim.name} <span class="text-[10px] text-amber-700">(${sim.group})</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const bodyHtml = `
+                <div class="space-y-3">
+                    <div class="bg-rose-50 border border-rose-200 p-3 rounded-xl text-rose-900 text-xs leading-relaxed">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i>
+                        O produto <b>"${typedProductName}"</b> ainda não existe no Banco de Dados (Catálogo Master). Para adicioná-lo ao fornecedor <b>${supplierName}</b>, escolha obrigatoriamente a categoria dele abaixo:
+                    </div>
+
+                    ${similarHtml}
+
+                    <div>
+                        <label class="font-bold text-[11px] uppercase text-zinc-500 block mb-1">Nome do Produto:</label>
+                        <input type="text" id="obrig-prod-name" value="${typedProductName.replace(/"/g, '&quot;')}" class="border border-zinc-300 p-2.5 rounded-xl w-full font-bold text-zinc-900 outline-none focus:border-zinc-900">
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-[11px] uppercase text-zinc-500 block mb-1">Categoria no Catálogo Base (Obrigatório):</label>
+                        <select id="obrig-prod-group" onchange="document.getElementById('obrig-new-group').classList.toggle('hidden', this.value !== 'NOVO_GRUPO_OBRIGATORIO'); document.getElementById('obrig-error').classList.add('hidden');" class="border border-zinc-300 p-2.5 rounded-xl w-full font-bold text-zinc-900 outline-none focus:border-zinc-900">
+                            ${opts}
+                        </select>
+                    </div>
+
+                    <input type="text" id="obrig-new-group" class="hidden border border-emerald-400 p-2.5 rounded-xl w-full bg-emerald-50 font-semibold text-zinc-900 outline-none" placeholder="Digite o nome da nova categoria...">
+                    <p id="obrig-error" class="hidden text-xs font-bold text-rose-600"><i class="fa-solid fa-circle-exclamation mr-1"></i>Selecione ou crie uma categoria para continuar.</p>
+                </div>
+            `;
+
+            showModal("Produto Não Cadastrado", bodyHtml, "Cadastrar e Adicionar", "bg-emerald-600 hover:bg-emerald-700", () => {
+                const finalName = document.getElementById('obrig-prod-name').value.trim();
+                let selectedGroup = document.getElementById('obrig-prod-group').value;
+                if (selectedGroup === 'NOVO_GRUPO_OBRIGATORIO') {
+                    selectedGroup = document.getElementById('obrig-new-group').value.trim();
+                }
+
+                if (!finalName || !selectedGroup) {
+                    const err = document.getElementById('obrig-error');
+                    if (err) err.classList.remove('hidden');
+                    return false;
+                }
+
+                pushStateToUndo();
+
+                // Verifica se o nome editado já existe no catálogo
+                let masterObj = state.masterData.find(m => normalizeText(m.name) === normalizeText(finalName));
+                if (!masterObj) {
+                    masterObj = { id: 'm' + Date.now(), group: selectedGroup, name: finalName };
+                    state.masterData.push(masterObj);
+                }
+
+                // Adiciona no fornecedor desejado
+                const existsInSupplier = state.products.some(p => p.categoryId === catId && normalizeText(p.name) === normalizeText(masterObj.name));
+                if (!existsInSupplier) {
+                    state.products.push({
+                        id: 'p' + (Date.now() + 1),
+                        categoryId: catId,
+                        name: masterObj.name,
+                        qty: 0,
+                        received: 0,
+                        type: 'Unidade',
+                        urgent: false,
+                        pending: false,
+                        selected: false
+                    });
+                }
+
+                saveData();
+                renderEstoque();
+            });
+        }
+
+        // Fecha listas de sugestões ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.cat-quick-add-wrapper')) {
+                document.querySelectorAll('.cat-sugg-box').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function updateBulkBar() {
+            const selectedCount = state.products.filter(p => p.selected).length;
+            const bar = document.getElementById('global-bulk-bar');
+            if (bar) {
+                if (selectedCount > 0) {
+                    bar.classList.remove('hidden');
+                    document.getElementById('bulk-count-text').innerText = selectedCount;
+                } else {
+                    bar.classList.add('hidden');
+                }
+            }
+        }
+
+        function clearBulkSelection() {
+            state.products.forEach(p => p.selected = false);
+            saveData(); renderEstoque(); updateBulkBar();
+        }
+
+        function renderEstoque() {
+            const catContainer = document.getElementById('categorias-container');
+            const sortedCats = state.categories.sort((a, b) => a.order - b.order);
+            const normGlobalSearch = normalizeText(uiState.searchQuery);
+
+            let filterChipsHtml = `
+                <div class="flex items-center justify-between mb-2.5">
+                    <h2 class="text-xs font-extrabold uppercase tracking-wider text-zinc-500">Fornecedores / Locais</h2>
+                    <button onclick="actionAddCategory()" class="text-xs bg-zinc-950 text-white px-3 py-1.5 rounded-xl font-bold hover:bg-zinc-800 transition shadow-2xs">
+                        <i class="fa-solid fa-plus text-emerald-400 mr-1"></i> Categoria
+                    </button>
+                </div>
+                <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-3">
+                    <button onclick="setCatFilter('ALL')" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition ${uiState.activeCatFilter === 'ALL' ? 'bg-zinc-950 text-white' : 'bg-white text-zinc-600 border border-zinc-200'}">Todos</button>
+            `;
+            sortedCats.forEach(c => {
+                const isActive = uiState.activeCatFilter === c.id;
+                filterChipsHtml += `<button onclick="setCatFilter('${c.id}')" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition border ${isActive ? 'bg-zinc-950 text-white border-zinc-950' : 'bg-white text-zinc-700 border-zinc-200'}"><span class="w-2 h-2 rounded-full" style="background-color:${c.color}"></span>${c.name}</button>`;
+            });
+            filterChipsHtml += `</div>`;
+
+            let html = filterChipsHtml;
+            const catsToDisplay = uiState.activeCatFilter === 'ALL' ? sortedCats : sortedCats.filter(c => c.id === uiState.activeCatFilter);
+
+            catsToDisplay.forEach((cat) => {
+                const realIndex = sortedCats.findIndex(c => c.id === cat.id);
+                let catProducts = state.products.filter(p => p.categoryId === cat.id);
+                if (normGlobalSearch) {
+                    catProducts = catProducts.filter(p => normalizeText(p.name).includes(normGlobalSearch));
+                }
+
+                const isCollapsed = uiState.collapsedCats[cat.id] && uiState.activeCatFilter === 'ALL' && !normGlobalSearch;
+                const bgLight = `rgba(${parseInt(cat.color.slice(1, 3), 16)}, ${parseInt(cat.color.slice(3, 5), 16)}, ${parseInt(cat.color.slice(5, 7), 16)}, 0.12)`;
+                
+                html += `
+                    <div class="cat-container bg-white rounded-2xl shadow-2xs border border-zinc-200/90 mb-3 overflow-visible transition-all duration-150" 
+                         ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${cat.id}')">
+                        <div class="bg-white px-3.5 py-2.5 flex justify-between items-center border-b border-zinc-100 cursor-move group rounded-t-2xl" style="border-left: 5px solid ${cat.color}" draggable="true" ondragstart="handleDragStart(event, 'cat', ${realIndex})" ondragend="handleDragEnd(event)">
+                            <div class="flex items-center gap-2 flex-1 cursor-pointer" onclick="toggleCatCollapse('${cat.id}')">
+                                <i class="fa-solid fa-grip-vertical text-zinc-300 text-xs"></i>
+                                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color:${cat.color}"></span>
+                                <h3 class="font-extrabold text-sm text-zinc-900">${cat.name}</h3>
+                                <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">${catProducts.length}</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button onclick="actionEditCategory('${cat.id}')" class="text-zinc-400 hover:text-zinc-800 w-7 h-7 rounded-lg hover:bg-zinc-100"><i class="fa-solid fa-palette text-xs"></i></button>
+                                <button onclick="actionDeleteCategory('${cat.id}')" class="text-zinc-400 hover:text-rose-600 w-7 h-7 rounded-lg hover:bg-rose-50"><i class="fa-solid fa-trash text-xs"></i></button>
+                                <button onclick="toggleCatCollapse('${cat.id}')" class="text-zinc-400 hover:text-zinc-800 w-7 h-7 rounded-lg flex items-center justify-center">
+                                    <i class="fa-solid fa-chevron-${isCollapsed ? 'down' : 'up'} text-[11px]"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="${isCollapsed ? 'hidden' : 'p-2.5 space-y-2'}">
+                            <!-- Barra de Adição Escrevendo com Busca Semelhante e Sem Acento -->
+                            <div class="relative cat-quick-add-wrapper">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="relative flex-1">
+                                        <i class="fa-solid fa-keyboard absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-[11px]"></i>
+                                        <input type="text" id="cat-input-${cat.id}"
+                                               oninput="handleCatQuickInput('${cat.id}', this.value)"
+                                               onkeydown="if(event.key === 'Enter'){ event.preventDefault(); submitCatQuickAdd('${cat.id}'); }"
+                                               placeholder="Adicionar item escrevendo em ${cat.name}..."
+                                               autocomplete="off"
+                                               class="w-full pl-8 pr-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-900 placeholder-zinc-400 focus:bg-white focus:outline-none focus:border-zinc-900 transition">
+                                    </div>
+                                    <button type="button" onclick="submitCatQuickAdd('${cat.id}')" class="bg-zinc-950 hover:bg-zinc-800 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold transition shrink-0 flex items-center gap-1">
+                                        <i class="fa-solid fa-plus text-emerald-400 text-[10px]"></i> Adicionar
+                                    </button>
+                                </div>
+                                <div id="cat-sugg-${cat.id}" class="cat-sugg-box hidden absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-30 max-h-52 overflow-y-auto"></div>
+                            </div>
+                `;
+
+                if (catProducts.length === 0) html += `<div class="text-xs text-zinc-400 py-3 text-center">Sem produtos alocados. Escreva acima ou arraste do catálogo.</div>`;
+
+                catProducts.forEach(prod => {
+                    const isSelected = prod.qty > 0;
+                    
+                    const isMentioned = state.notas.some(n => n.text.toLowerCase().includes('@' + prod.name.toLowerCase()));
+                    const mentionBadge = isMentioned ? `<button onclick="openNoteFor('${prod.name}')" class="ml-1.5 text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-black hover:bg-amber-100 transition" title="Ver anotação"><i class="fa-solid fa-at"></i> Nota</button>` : '';
+
+                    html += `
+                        <div class="border rounded-xl px-3 py-2 transition-all ${isSelected ? (prod.urgent ? 'urgent-card' : 'shadow-2xs') : 'border-zinc-200/80 bg-zinc-50/60'}" ${isSelected && !prod.urgent ? `style="background-color: ${bgLight}; border-color:${cat.color};"` : ''}>
+                            <div class="flex justify-between items-center gap-2">
+                                <div class="flex-1 flex items-center gap-2.5 min-w-0">
+                                    <input type="checkbox" ${prod.selected ? 'checked' : ''} onchange="toggleProductSelection('${prod.id}')" class="w-4 h-4 accent-zinc-900 cursor-pointer shrink-0">
+                                    <div class="min-w-0 flex-1 flex items-center">
+                                        <span class="font-bold text-zinc-900 text-sm truncate">${prod.name}</span>
+                                        ${mentionBadge}
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <button onclick="actionDeleteProduct('${prod.id}')" class="w-7 h-7 rounded-lg text-zinc-400 hover:text-rose-600 flex items-center justify-center transition"><i class="fa-solid fa-xmark text-xs"></i></button>
+                                    <div class="flex items-center bg-white border border-zinc-200 rounded-xl p-0.5 shadow-2xs">
+                                        <button onclick="updateQty('${prod.id}', -1, 'estoque')" class="w-7 h-7 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200 font-bold text-sm transition">-</button>
+                                        <span class="w-7 text-center font-extrabold text-sm text-zinc-900">${prod.qty}</span>
+                                        <button onclick="updateQty('${prod.id}', 1, 'estoque')" class="w-7 h-7 rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 font-bold text-sm transition">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${isSelected ? `
+                                <div class="mt-2.5 pt-2.5 border-t border-zinc-200/80 flex justify-between items-center gap-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <label class="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wide">Medida:</label>
+                                        <select onchange="updateType('${prod.id}', this.value)" class="text-xs border border-zinc-300 rounded-lg bg-white px-2 py-1 font-bold text-zinc-800 outline-none shadow-2xs">
+                                            <option value="Unidade" ${prod.type === 'Unidade' ? 'selected' : ''}>Unidade</option>
+                                            <option value="Caixa" ${prod.type === 'Caixa' ? 'selected' : ''}>Caixa</option>
+                                            <option value="Pacote" ${prod.type === 'Pacote' ? 'selected' : ''}>Pacote</option>
+                                            <option value="Kg" ${prod.type === 'Kg' ? 'selected' : ''}>Kg</option>
+                                        </select>
+                                    </div>
+                                    <button onclick="toggleUrgent('${prod.id}')" class="text-[10px] px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-extrabold uppercase transition ${prod.urgent ? 'bg-rose-600 text-white shadow-xs' : 'bg-white text-zinc-600 border border-zinc-300 shadow-2xs hover:bg-zinc-50'}">
+                                        <i class="fa-solid fa-bolt"></i> ${prod.urgent ? 'Urgente' : 'Normal'}
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            });
+            catContainer.innerHTML = html;
+            renderMasterData();
+            updateBulkBar();
+        }
+
+        function renderMasterData() {
+            const container = document.getElementById('master-data-list');
+            const grouped = {}; const allGroups = [];
+            const normGlobalSearch = normalizeText(uiState.searchQuery);
+
+            state.masterData.forEach(item => {
+                if (!allGroups.includes(item.group)) allGroups.push(item.group);
+                if (normGlobalSearch && !normalizeText(item.name).includes(normGlobalSearch) && !normalizeText(item.group).includes(normGlobalSearch)) return;
+                if (!grouped[item.group]) grouped[item.group] = []; grouped[item.group].push(item);
+            });
+
+            let groupChips = `<div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 border-b border-zinc-100"><button onclick="setMasterGroupFilter('ALL')" class="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${uiState.activeMasterGroup === 'ALL' ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-600'}">Todos</button>`;
+            allGroups.forEach(gName => { groupChips += `<button onclick="setMasterGroupFilter('${gName}')" class="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold ${uiState.activeMasterGroup === gName ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-600'}">${gName}</button>`; });
+            groupChips += `</div>`;
+
+            let html = groupChips + `<div class="max-h-[62vh] overflow-y-auto pr-0.5 space-y-3 pt-1">`;
+            for (const [groupName, items] of Object.entries(grouped)) {
+                if (uiState.activeMasterGroup !== 'ALL' && uiState.activeMasterGroup !== groupName) continue;
+
+                html += `<div class="border border-zinc-200/80 rounded-xl bg-zinc-50/50 overflow-hidden"><div class="bg-zinc-100/80 px-3 py-1.5 border-b border-zinc-200/60 font-extrabold text-[11px] uppercase tracking-wider text-zinc-600">${groupName}</div><div class="p-2.5 flex flex-wrap gap-1.5">`;
+                
+                items.forEach(item => {
+                    const alloc = getMasterItemAllocation(item.name);
+                    let pillStyle = '';
+                    
+                    if (alloc.isAllocated) {
+                        if (alloc.colors.length === 1) {
+                            pillStyle = `background-color: ${alloc.colors[0]}; border: none; color: white;`;
+                        } else {
+                            const step = 100 / alloc.colors.length;
+                            let gradParts = [];
+                            alloc.colors.forEach((c, i) => { gradParts.push(`${c} ${i * step}%`); gradParts.push(`${c} ${(i + 1) * step}%`); });
+                            pillStyle = `background: linear-gradient(90deg, ${gradParts.join(', ')}); border: none; color: white; text-shadow: 0px 1px 2px rgba(0,0,0,0.5);`;
+                        }
+                    }
+
+                    const pillClasses = alloc.isAllocated ? "flex items-center rounded-full pl-2.5 pr-1 py-1 shadow-2xs text-xs font-bold cursor-grab" : "flex items-center bg-white border border-zinc-300 rounded-full pl-2.5 pr-1 py-1 shadow-2xs text-xs font-semibold text-zinc-800 hover:border-zinc-900 cursor-grab";
+                    
+                    html += `
+                        <div class="${pillClasses}" style="${pillStyle}" draggable="true" ondragstart="handleDragStart(event, 'master', '${item.id}')" ondragend="handleDragEnd(event)">
+                            <i class="fa-solid fa-grip-vertical ${alloc.isAllocated ? 'text-white/70' : 'text-zinc-300'} mr-1.5 text-[9px]"></i>
+                            <span class="mr-1.5">${item.name}</span>
+                            <button onclick="actionMoveFromMasterToCat('${item.id}')" class="${alloc.isAllocated ? 'bg-black/20 hover:bg-black/40 text-white' : 'bg-zinc-900 hover:bg-emerald-500 text-emerald-400 hover:text-white'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
+                            <button onclick="actionDeleteMasterItem('${item.id}')" class="${alloc.isAllocated ? 'ml-0.5 text-white/75 hover:text-white' : 'ml-0.5 text-zinc-400 hover:text-rose-600'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            }
+            html += `</div>`;
+            document.getElementById('master-data-list').innerHTML = html;
+        }
+
+        function updateQty(id, change, fromView) {
+            const prod = state.products.find(p => p.id === id);
+            if (!prod) return;
+
+            if (fromView === 'lista') {
+                prod.received = Math.max(0, prod.received + change);
+            } else {
+                prod.qty = Math.max(0, prod.qty + change);
+                prod.received = prod.qty; 
+                if (prod.qty === 0) { prod.urgent = false; prod.pending = false; }
+            }
+            saveData(); 
+            if(fromView === 'estoque') renderEstoque();
+            if(fromView === 'lista') renderLista();
+        }
+
+        function renderLista() {
+            const container = document.getElementById('view-lista');
+            const allSelected = state.products.filter(p => p.qty > 0 || p.pending);
+            const visibleItems = allSelected.filter(p => !p.pending);
+            const pendingItems = allSelected.filter(p => p.pending);
+
+            if (allSelected.length === 0) {
+                container.innerHTML = `<div class="text-center p-10 bg-white rounded-2xl border border-zinc-200/80 shadow-2xs text-zinc-400 font-bold"><i class="fa-solid fa-basket-shopping text-2xl mb-2"></i><br>Sua lista está vazia</div>`;
+                return;
+            }
+
+            let html = `
+                <div class="grid grid-cols-2 gap-2.5 mb-4 sticky top-0 bg-zinc-100/95 backdrop-blur-md pt-1 pb-2 z-10">
+                    <button onclick="actionCheckDiscrepancies()" class="bg-zinc-950 text-white py-3 px-4 rounded-xl font-extrabold shadow-sm hover:bg-zinc-800 flex items-center justify-center gap-2 text-xs transition">
+                        <i class="fa-solid fa-check-double text-emerald-400 text-sm"></i> FINALIZAR
+                    </button>
+                    <button onclick="actionSendWhatsApp()" class="bg-emerald-500 text-zinc-950 py-3 px-4 rounded-xl font-extrabold shadow-sm hover:bg-emerald-400 flex items-center justify-center gap-2 text-xs transition">
+                        <i class="fa-brands fa-whatsapp text-base"></i> WhatsApp
+                    </button>
+                </div>
+            `;
+
+            const sortedCats = state.categories.sort((a, b) => a.order - b.order);
+            sortedCats.forEach(cat => {
+                const catItems = visibleItems.filter(p => p.categoryId === cat.id);
+                if (catItems.length === 0) return;
+                
+                const bgLight = `rgba(${parseInt(cat.color.slice(1, 3), 16)}, ${parseInt(cat.color.slice(3, 5), 16)}, ${parseInt(cat.color.slice(5, 7), 16)}, 0.08)`;
+                
+                html += `
+                    <div class="bg-white rounded-2xl shadow-2xs border border-zinc-200/90 mb-3 overflow-hidden" style="border-left: 5px solid ${cat.color}">
+                        <h3 class="font-extrabold text-zinc-900 px-3.5 py-2.5 border-b border-zinc-100 text-xs flex items-center gap-2" style="background-color: ${bgLight}">
+                            <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span> ${cat.name}
+                        </h3>
+                        <ul class="divide-y divide-zinc-100">
+                `;
+
+                catItems.forEach(prod => {
+                    const isMentioned = state.notas.some(n => n.text.toLowerCase().includes('@' + prod.name.toLowerCase()));
+                    const mentionBadge = isMentioned ? `<button onclick="openNoteFor('${prod.name}')" class="ml-1.5 text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-at"></i> Nota</button>` : '';
+
+                    html += `
+                        <li class="px-3.5 py-2.5 ${prod.urgent ? 'bg-rose-50/70' : ''}">
+                            <div class="flex justify-between items-center gap-2">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-1">
+                                        <span class="font-bold text-zinc-900 text-sm truncate ${prod.urgent ? 'text-rose-700' : ''}">${prod.name}</span>
+                                        ${mentionBadge} ${prod.urgent ? '<span class="text-[9px] uppercase font-extrabold bg-rose-600 text-white px-1.5 py-0.5 rounded ml-1">Urgente</span>' : ''}
+                                    </div>
+                                    <div class="text-zinc-500 font-semibold text-[10px] mt-0.5">Pedido: <span class="text-zinc-800">${prod.qty}</span> | Recebido:</div>
+                                </div>
+                                <div class="flex items-center gap-1 bg-zinc-100 border border-zinc-200 rounded-xl p-0.5">
+                                    <button onclick="updateQty('${prod.id}', -1, 'lista')" class="w-8 h-8 rounded-lg bg-white text-zinc-700 hover:bg-zinc-50 font-bold text-sm shadow-2xs">-</button>
+                                    <span class="w-7 text-center font-extrabold text-[15px] text-zinc-900">${prod.received}</span>
+                                    <button onclick="updateQty('${prod.id}', 1, 'lista')" class="w-8 h-8 rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 font-bold text-sm shadow-2xs">+</button>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                });
+                html += `</ul></div>`;
+            });
+
+            if (pendingItems.length > 0) {
+                html += `<div class="mt-6 mb-4 border border-dashed border-amber-400 rounded-2xl bg-amber-50/70 p-3.5"><h3 class="text-amber-900 font-extrabold mb-2.5 text-xs uppercase flex items-center gap-1.5"><i class="fa-solid fa-box-open text-amber-600"></i> Adiados p/ Próxima</h3><div class="space-y-1.5">`;
+                pendingItems.forEach(prod => {
+                    html += `
+                        <div class="bg-white border border-amber-200/80 px-3 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+                            <div><span class="font-bold text-zinc-800 text-xs">${prod.name}</span><span class="text-[11px] font-semibold text-amber-700 ml-1.5 bg-amber-100 px-1.5 py-0.5 rounded">Faltou: ${prod.qty}</span></div>
+                            <button onclick="actionToggleRestore('${prod.id}')" class="text-zinc-950 font-extrabold text-[11px] bg-emerald-400 px-2.5 py-1 rounded-lg hover:bg-emerald-300">Restaurar</button>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function actionToggleRestore(id) {
+            const prod = state.products.find(p => p.id === id);
+            if (prod) { prod.pending = false; prod.received = prod.qty; saveData(); renderLista(); }
+        }
+
+        function actionCheckDiscrepancies() {
+            const discrepancies = [];
+            state.products.forEach(p => {
+                if (p.qty > 0 && !p.pending) {
+                    if (p.received < p.qty) discrepancies.push({ type: 'missing', prod: p, diff: p.qty - p.received });
+                    else if (p.received > p.qty) discrepancies.push({ type: 'extra', prod: p, diff: p.received - p.qty });
+                }
+            });
+
+            if (discrepancies.length > 0) {
+                let html = `<div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1 no-scrollbar">`;
+                discrepancies.forEach((d, i) => {
+                    if (d.type === 'missing') {
+                        html += `
+                            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                                <p class="text-[13px] font-bold text-amber-900 mb-2 leading-tight">Faltaram <span class="text-rose-600">${d.diff}x</span> ${d.prod.name}</p>
+                                <label class="flex items-center gap-2 text-xs text-zinc-700 font-semibold mb-2 cursor-pointer">
+                                    <input type="checkbox" id="chk-adiar-${i}" class="w-4 h-4 accent-emerald-600 rounded" checked onchange="document.getElementById('urg-${i}').classList.toggle('opacity-40')"> Adiar para o próximo pedido
+                                </label>
+                                <div id="urg-${i}" class="pl-6 transition-opacity">
+                                    <label class="flex items-center gap-2 text-xs text-rose-700 font-bold cursor-pointer">
+                                        <input type="checkbox" id="chk-urg-${i}" class="w-4 h-4 accent-rose-600 rounded"> Entra como URGENTE
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                                <p class="text-[13px] font-bold text-blue-900 mb-2 leading-tight">Vieram <span class="text-blue-700">${d.diff}x</span> a mais de ${d.prod.name}</p>
+                                <label class="flex items-center gap-2 text-xs text-zinc-700 font-semibold cursor-pointer">
+                                    <input type="checkbox" id="chk-extra-${i}" class="w-4 h-4 accent-emerald-600 rounded" checked> Registrar extra no histórico
+                                </label>
+                            </div>
+                        `;
+                    }
+                });
+                html += `</div>`;
+                showModal("Resolver Divergências", html, "Confirmar e Fechar", "bg-zinc-950 hover:bg-zinc-800", () => {
+                    const choices = discrepancies.map((d, i) => {
+                        if (d.type === 'missing') return { adiar: document.getElementById(`chk-adiar-${i}`).checked, urg: document.getElementById(`chk-urg-${i}`).checked };
+                        else return { reg: document.getElementById(`chk-extra-${i}`).checked };
+                    });
+                    executeFinalize(discrepancies, choices);
+                });
+            } else {
+                showModal("Finalizar Compras", "<p class='text-zinc-700 text-sm'>Todos os itens conferem perfeitamente com o pedido inicial.</p><p class='font-bold mt-2 text-zinc-900'>Deseja finalizar a compra e registrar no histórico?</p>", "Finalizar Compra", "bg-emerald-600 hover:bg-emerald-700", () => {
+                    executeFinalize([], []);
+                });
+            }
+        }
+
+        function executeFinalize(discrepancies, choices) {
+            pushStateToUndo();
+
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const exactDateStr = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            if (!state.history[currentMonth]) state.history[currentMonth] = {};
+
+            const remaining = [];
+
+            state.products.forEach(p => {
+                if (p.qty > 0) {
+                    if (p.pending) {
+                        p.pending = false; 
+                        remaining.push(p);
+                        return;
+                    }
+
+                    let toHistoryQty = p.received;
+                    let adiarMissing = false, missingDiff = 0, markUrg = false;
+                    const dIdx = discrepancies.findIndex(d => d.prod.id === p.id);
+
+                    if (dIdx > -1) {
+                        const d = discrepancies[dIdx], c = choices[dIdx];
+                        if (d.type === 'missing') {
+                            toHistoryQty = p.received; 
+                            if (c.adiar) { adiarMissing = true; missingDiff = d.diff; markUrg = c.urg; }
+                        } else if (d.type === 'extra') {
+                            toHistoryQty = c.reg ? p.received : p.qty; 
+                        }
+                    }
+
+                    if (toHistoryQty > 0) {
+                        const cat = state.categories.find(c => c.id === p.categoryId) || { name: 'Outros', color: '#9ca3af' };
+                        if (!state.history[currentMonth][p.categoryId]) state.history[currentMonth][p.categoryId] = { name: cat.name, color: cat.color, items: {} };
+                        
+                        const key = `${p.name} (${p.type})`;
+                        const hCat = state.history[currentMonth][p.categoryId].items;
+                        
+                        if (!hCat[key]) hCat[key] = { total: 0, entries: [] };
+                        if (hCat[key].dates && !hCat[key].entries) { hCat[key].entries = hCat[key].dates.map(d => ({ date: d, qty: '?' })); delete hCat[key].dates; }
+                        
+                        hCat[key].total += toHistoryQty;
+                        hCat[key].entries.push({ date: exactDateStr, qty: toHistoryQty });
+                    }
+
+                    if (adiarMissing) {
+                        p.qty = missingDiff; p.received = missingDiff; p.pending = true;
+                        if (markUrg) p.urgent = true;
+                        remaining.push(p);
+                    } else {
+                        p.qty = 0; p.received = 0; p.urgent = false; p.pending = false;
+                        remaining.push(p); 
+                    }
+                } else {
+                    remaining.push(p);
+                }
+            });
+
+            state.products = remaining;
+            saveData(); 
+            renderLista(); 
+        }
+
+        // --- SISTEMA DE EMOJIS, NOTAS E MENÇÕES (@) ---
+        function insertEmoji(emoji) {
+            const input = document.getElementById('note-input');
+            input.value += emoji;
+            input.focus();
+        }
+
+        function renderEmojis() {
+            const container = document.getElementById('emoji-list');
+            if(!container) return;
+            container.innerHTML = state.emojis.map(e => `<button onclick="insertEmoji('${e}')" class="shrink-0 w-8 h-8 flex items-center justify-center bg-zinc-100 rounded-full text-sm hover:bg-zinc-200 transition shadow-2xs">${e}</button>`).join('');
+        }
+
+        function renderNotas(filterKeyword = '') {
+            const container = document.getElementById('notes-list');
+            const searchVal = document.getElementById('note-search').value.toLowerCase();
+            const keyword = filterKeyword || searchVal;
+
+            if (state.notas.length === 0) {
+                container.innerHTML = '<div class="text-center p-6 text-zinc-400 text-xs font-semibold border border-dashed border-zinc-300 rounded-2xl">Nenhuma nota criada.</div>';
+                return;
+            }
+
+            let html = '';
+            state.notas.slice().reverse().forEach(n => {
+                if (keyword && !n.text.toLowerCase().includes(keyword)) return;
+                
+                const formattedText = n.text.replace(/@([\wÀ-ÿ\s]+)(?=\s|$|\.|,|!|\?)/g, (match) => {
+                    return `<span class="text-amber-600 font-bold bg-amber-50 px-1 rounded border border-amber-100">${match}</span>`;
+                });
+
+                html += `
+                    <div class="bg-white p-4 rounded-2xl shadow-2xs border border-zinc-200 relative">
+                        <p class="text-sm text-zinc-800 whitespace-pre-wrap">${formattedText}</p>
+                        <p class="text-[10px] font-bold text-zinc-400 mt-3"><i class="fa-regular fa-clock"></i> ${n.date}</p>
+                        <button onclick="actionDeleteNote('${n.id}')" class="absolute top-3 right-3 w-7 h-7 bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-rose-500 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function actionSaveNote() {
+            const input = document.getElementById('note-input');
+            const text = input.value.trim();
+            if(!text) return;
+            
+            pushStateToUndo();
+            state.notas.push({ id: 'n' + Date.now(), text: text, date: new Date().toLocaleString('pt-BR') });
+            
+            const regex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+            const found = text.match(regex);
+            if (found) {
+                state.emojis = [...new Set([...found, ...state.emojis])].slice(0, 30);
+            }
+
+            input.value = '';
+            saveData(); 
+            renderNotas(); 
+            renderEmojis();
+            renderEstoque();
+        }
+
+        function actionDeleteNote(id) {
+            pushStateToUndo();
+            state.notas = state.notas.filter(n => n.id !== id);
+            saveData(); renderNotas(); renderEstoque();
+        }
+
+        function openNoteFor(prodName) {
+            switchTab('notas');
+            document.getElementById('note-search').value = '@' + prodName;
+            renderNotas();
+        }
+
+        function actionSendWhatsApp() {
+            const visibleItems = state.products.filter(p => p.qty > 0 && !p.pending);
+            if (visibleItems.length === 0) return;
+            let text = `*📋 CHEFSTOCK PRO*\n_Data: ${new Date().toLocaleDateString('pt-BR')}_\n\n`;
+            state.categories.sort((a,b) => a.order - b.order).forEach(cat => {
+                const catItems = visibleItems.filter(p => p.categoryId === cat.id);
+                if (catItems.length > 0) {
+                    text += `*📍 ${cat.name.toUpperCase()}*\n`;
+                    catItems.forEach(prod => { text += `▫️ ${prod.qty} ${prod.type} - ${prod.name}${prod.urgent ? " 🚨" : ""}\n`; });
+                    text += "\n";
+                }
+            });
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function checkYearResetLogic() { if (new Date().getMonth() === 11 || state.yearResetPending) state.yearResetPending = true; }
+
+        function renderHistorico() {
+            const container = document.getElementById('view-historico');
+            checkYearResetLogic();
+
+            let html = `
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-sm font-extrabold uppercase tracking-wider text-zinc-800">Analytics Mensal</h2>
+                    </div>
+                    <div class="flex gap-2">
+                        ${undoStack.length > 0 ? `<button onclick="actionUndo()" class="text-[11px] bg-amber-400 text-zinc-950 px-2.5 py-2 rounded-xl font-bold hover:bg-amber-500 transition shadow-sm"><i class="fa-solid fa-rotate-left mr-1"></i> Desfazer</button>` : ''}
+                        ${redoStack.length > 0 ? `<button onclick="actionRedo()" class="text-[11px] bg-emerald-500 text-zinc-950 px-2.5 py-2 rounded-xl font-bold hover:bg-emerald-400 transition shadow-sm"><i class="fa-solid fa-rotate-right mr-1"></i> Refazer</button>` : ''}
+                        ${state.yearResetPending ? `<button onclick="actionResetYear()" class="text-xs bg-rose-600 text-white px-3 py-2 rounded-xl font-bold hover:bg-rose-700 animate-pulse">Fechar Ano</button>` : ''}
+                    </div>
+                </div>
+            `;
+
+            const months = Object.keys(state.history).sort().reverse();
+
+            if (months.length === 0) {
+                html += `<div class="bg-white p-10 rounded-2xl text-center border border-zinc-200/80 text-zinc-400 text-sm font-semibold">Histórico vazio.</div>`;
+                container.innerHTML = html; return;
+            }
+
+            months.forEach(month => {
+                const [y, m] = month.split('-');
+                const monthName = new Date(y, m - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+                const targetId = `hist-${month}`;
+                
+                html += `
+                    <div class="bg-white rounded-2xl shadow-2xs mb-3 border border-zinc-200 overflow-hidden">
+                        <button onclick="document.getElementById('${targetId}').classList.toggle('hidden')" class="w-full bg-zinc-950 text-white px-4 py-3.5 font-extrabold text-xs tracking-wider flex justify-between items-center">
+                            <span class="flex items-center gap-2"><i class="fa-regular fa-calendar-days text-emerald-400"></i> ${monthName}</span>
+                            <i class="fa-solid fa-chevron-down text-zinc-400"></i>
+                        </button>
+                        <div id="${targetId}" class="accordion-content hidden p-3 space-y-3 bg-zinc-50">
+                            <div class="flex justify-end pb-1">
+                                <button onclick="actionDeleteMonth('${month}', '${monthName}')" class="text-[10px] bg-white border border-rose-200 text-rose-600 px-2.5 py-1.5 rounded-lg font-bold shadow-2xs hover:bg-rose-50 hover:border-rose-300 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-trash"></i> Apagar Mês
+                                </button>
+                            </div>
+                `;
+
+                for (const [catId, catData] of Object.entries(state.history[month])) {
+                    html += `
+                        <div class="border border-zinc-200 rounded-xl bg-white shadow-2xs overflow-hidden">
+                            <h4 class="font-extrabold px-3 py-2 text-xs flex items-center gap-2 border-b border-zinc-100" style="background-color: ${hexToRgba(catData.color, 0.1)}">
+                                <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${catData.color}"></div> ${catData.name}
+                            </h4>
+                            <table class="w-full text-xs text-left">
+                                <tbody class="divide-y divide-zinc-100">
+                    `;
+                    for (const [itemName, itemData] of Object.entries(catData.items)) {
+                        const entriesHtml = itemData.entries 
+                            ? itemData.entries.map(e => `<div class="flex justify-between items-center text-zinc-500 py-0.5"><span class="text-[9px]"><i class="fa-solid fa-arrow-turn-down ml-1 mr-1 text-zinc-300"></i> ${e.date}</span> <b class="text-zinc-700 text-[10px]">+${e.qty}</b></div>`).join('') 
+                            : (itemData.dates ? itemData.dates.map(d => `<div class="flex justify-between items-center text-zinc-500 py-0.5"><span class="text-[9px]"><i class="fa-solid fa-arrow-turn-down ml-1 mr-1 text-zinc-300"></i> ${d}</span></div>`).join('') : '');
+
+                        html += `
+                            <tr class="border-t border-zinc-100/60 hover:bg-zinc-50/80 transition-colors">
+                                <td class="px-3.5 py-3">
+                                    <div class="font-bold text-zinc-800 text-xs">${itemName}</div>
+                                    ${entriesHtml ? `<div class="mt-1.5 pl-1 border-l-2 border-zinc-200 bg-zinc-50/50 rounded p-1">${entriesHtml}</div>` : ''}
+                                </td>
+                                <td class="px-3.5 py-3 text-right font-extrabold text-emerald-600 align-top text-sm">${itemData.total}</td>
+                            </tr>
+                        `;
+                    }
+                    html += `</tbody></table></div>`;
+                }
+                html += `</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function actionDeleteMonth(monthKey, monthName) {
+            showModal("Excluir Mês", `<p class='text-sm text-zinc-700'>Tem certeza que deseja apagar todo o registro de <b>${monthName}</b>?</p><p class='text-xs text-zinc-500 mt-2'>Os dados removidos podem ser restaurados usando o botão "Desfazer".</p>`, "Excluir", "bg-rose-600 hover:bg-rose-700", () => {
+                pushStateToUndo();
+                delete state.history[monthKey];
+                saveData(); 
+                renderHistorico();
+            });
+        }
+
+        function actionResetYear() {
+            showModal("Virada de Ano", "<p class='text-rose-600 font-bold'>Esta ação apagará todos os dados arquivados!</p>", "Zerar Tudo", "bg-rose-600 hover:bg-rose-700", () => {
+                pushStateToUndo();
+                state.history = {}; state.yearResetPending = false;
+                saveData(); renderHistorico();
+            });
+        }
+
+        // Ações Rápidas Categorias/Produtos...
+        function actionAddCategory() {
+            showModal("Nova Categoria", `<label class="font-bold text-xs uppercase text-zinc-500">Local:</label><input type="text" id="ncat-name" class="border border-zinc-300 p-2.5 rounded-xl w-full font-semibold outline-none focus:border-zinc-900 mt-1"><label class="font-bold text-xs uppercase text-zinc-500 mt-3 block">Cor:</label><input type="color" id="ncat-color" class="w-full h-11 p-1 border border-zinc-300 rounded-xl mt-1 cursor-pointer" value="#10b981">`, "Criar", "bg-zinc-950", () => {
+                const n = document.getElementById('ncat-name').value.trim(), c = document.getElementById('ncat-color').value;
+                if (!n) return false; pushStateToUndo(); state.categories.push({ id: 'c' + Date.now(), name: n, color: c, order: state.categories.length }); saveData(); renderEstoque();
+            });
+        }
+        function actionEditCategory(id) {
+            const cat = state.categories.find(c => c.id === id);
+            showModal("Editar Categoria", `<label class="font-bold text-xs text-zinc-500">Nova Cor para ${cat.name}:</label><input type="color" id="ecat-color" class="w-full h-12 p-1 border border-zinc-300 rounded-xl mt-2 cursor-pointer" value="${cat.color}">`, "Salvar", "bg-emerald-600 hover:bg-emerald-700", () => { pushStateToUndo(); cat.color = document.getElementById('ecat-color').value; saveData(); renderEstoque(); });
+        }
+        function actionDeleteCategory(id) { showModal("Excluir", "<p class='text-sm text-zinc-700'>Excluir esta categoria e desvincular itens?</p>", "Excluir", "bg-rose-600 hover:bg-rose-700", () => { pushStateToUndo(); state.categories = state.categories.filter(c => c.id !== id); state.products = state.products.filter(p => p.categoryId !== id); if(uiState.activeCatFilter===id) uiState.activeCatFilter='ALL'; saveData(); renderEstoque(); }); }
+        
+        function toggleProductSelection(id) { const p = state.products.find(x => x.id === id); if(p){ p.selected = !p.selected; saveData(); renderEstoque(); updateBulkBar(); } }
+        function actionGlobalBulkMove() {
+            const sel = state.products.filter(p => p.selected);
+            if(sel.length===0) return;
+            const opts = state.categories.sort((a,b)=>a.order-b.order).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            showModal("Mover em Massa", `<p class="mb-3 text-sm font-semibold text-zinc-700">Mover ${sel.length} itens para:</p><select id="bdest" class="border border-zinc-300 p-2.5 rounded-xl w-full font-bold outline-none focus:border-zinc-900">${opts}</select>`, "Mover", "bg-zinc-950 hover:bg-zinc-800", () => { pushStateToUndo(); const dest = document.getElementById('bdest').value; sel.forEach(p => { p.categoryId = dest; p.selected = false; }); saveData(); renderEstoque(); updateBulkBar(); });
+        }
+        function clearBulkSelection() { state.products.forEach(p => p.selected = false); saveData(); renderEstoque(); updateBulkBar(); }
+
+        function actionDeleteProduct(id) { showModal("Remover", "<p class='text-sm text-zinc-700'>Remover este item da categoria atual?</p>", "Remover", "bg-rose-600 hover:bg-rose-700", () => { pushStateToUndo(); state.products = state.products.filter(p => p.id !== id); saveData(); renderEstoque(); }); }
+        function actionAddMasterItem() {
+            const defaultGroups = SEED_MASTER.map(g => g.group);
+            const g = [...new Set([...defaultGroups, ...state.masterData.map(m => m.group)])];
+            const opts = g.map(x => `<option value="${x}">${x}</option>`).join('') + `<option value="NOVO">+ Criar Novo Grupo</option>`;
+            showModal("Novo no Catálogo", `<input type="text" id="nm-name" class="border border-zinc-300 p-2.5 rounded-xl w-full mb-3 font-semibold outline-none focus:border-zinc-900" placeholder="Nome do Produto"><select id="nm-grp" onchange="document.getElementById('nmg-name').classList.toggle('hidden', this.value !== 'NOVO')" class="border border-zinc-300 p-2.5 rounded-xl w-full mb-3 font-semibold outline-none focus:border-zinc-900">${opts}</select><input type="text" id="nmg-name" class="hidden border border-emerald-400 p-2.5 rounded-xl w-full bg-emerald-50 font-semibold outline-none focus:border-emerald-600" placeholder="Nome do Novo Grupo">`, "Adicionar", "bg-emerald-600 hover:bg-emerald-700", () => {
+                const n = document.getElementById('nm-name').value.trim(); let grp = document.getElementById('nm-grp').value; if(grp==='NOVO') grp = document.getElementById('nmg-name').value.trim();
+                if(!n || !grp) return false; pushStateToUndo(); state.masterData.push({ id: 'm' + Date.now(), group: grp, name: n }); saveData(); renderEstoque();
+            });
+        }
+        function actionDeleteMasterItem(id) { showModal("Excluir", "<p class='text-sm text-zinc-700'>Remover definitivamente do Catálogo Base?</p>", "Excluir", "bg-rose-600 hover:bg-rose-700", () => { pushStateToUndo(); state.masterData = state.masterData.filter(m => m.id !== id); saveData(); renderEstoque(); }); }
+        function actionMoveFromMasterToCat(id) {
+            const item = state.masterData.find(m => m.id === id); if(state.categories.length===0) return;
+            const opts = state.categories.sort((a,b)=>a.order-b.order).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            showModal("Alocar", `<p class="mb-3 text-sm text-zinc-700">Alocar <b>${item.name}</b> em qual fornecedor?</p><select id="dcat" class="border border-zinc-300 p-2.5 rounded-xl w-full font-bold outline-none focus:border-zinc-900">${opts}</select>`, "Adicionar", "bg-zinc-950 hover:bg-zinc-800", () => {
+                const cId = document.getElementById('dcat').value, ext = state.products.find(p => normalizeText(p.name) === normalizeText(item.name) && p.categoryId === cId);
+                if(!ext) { pushStateToUndo(); state.products.push({ id: 'p'+Date.now(), categoryId: cId, name: item.name, qty: 0, received: 0, type: 'Unidade', urgent: false, pending: false, selected: false }); }
+                saveData(); renderEstoque();
+            });
+        }
+        function updateType(id, t) { const p = state.products.find(x => x.id === id); if(p){ pushStateToUndo(); p.type = t; saveData(); } }
+        function toggleUrgent(id) { const p = state.products.find(x => x.id === id); if(p){ pushStateToUndo(); p.urgent = !p.urgent; saveData(); renderEstoque(); } }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
