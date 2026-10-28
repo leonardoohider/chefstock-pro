@@ -63,11 +63,84 @@
 </head>
 <body class="h-dvh flex flex-col overflow-hidden select-none bg-zinc-100 relative">
 
-    <!-- HEADER -->
-    <header class="bg-zinc-950 text-white px-4 py-3 flex justify-between items-center z-30 shadow-md shrink-0">
+    <!-- ===================================================================== -->
+    <!-- MODO COMPRADOR EXCLUSIVO (ACESSADO PELO LINK ENVIADO NO WHATSAPP)     -->
+    <!-- ===================================================================== -->
+    <div id="buyer-app-shell" class="hidden flex-1 min-h-0 flex flex-col overflow-hidden bg-zinc-100">
+        <!-- Header Exclusivo do Comprador (Sem acesso ao sistema principal) -->
+        <header class="bg-zinc-950 text-white px-4 py-3 flex justify-between items-center shadow-md shrink-0">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500 text-zinc-950 flex items-center justify-center font-black shadow-sm shadow-emerald-500/30">
+                    <i class="fa-solid fa-cart-shopping text-sm"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-base font-extrabold tracking-tight leading-none">Lista de Compras</h1>
+                        <span id="buyer-list-number-badge" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-extrabold">Lista #1</span>
+                    </div>
+                    <p class="text-[10px] text-zinc-400 font-medium mt-0.5">Modo Comprador • Apenas Conferência</p>
+                </div>
+            </div>
+
+            <!-- Botão Superior para Zerar / Fechar a Lista -->
+            <button id="btn-buyer-clear-list" onclick="actionBuyerCloseList(false)" class="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95">
+                <i class="fa-solid fa-broom"></i>
+                <span>Zerar Lista</span>
+            </button>
+        </header>
+
+        <!-- Alerta Obrigatório de Atualização quando uma nova lista é enviada -->
+        <div id="buyer-update-banner" class="hidden bg-amber-500 text-zinc-950 px-4 py-3.5 shadow-lg border-b-2 border-amber-600 z-30 shrink-0">
+            <div class="max-w-xl mx-auto flex flex-col gap-2.5">
+                <div class="flex items-start gap-2.5">
+                    <i class="fa-solid fa-triangle-exclamation text-lg mt-0.5"></i>
+                    <div class="flex-1 text-xs">
+                        <p class="font-extrabold text-sm uppercase tracking-tight">Nova atualização recebida na lista!</p>
+                        <p id="buyer-update-details" class="font-bold mt-0.5 leading-snug">Foram adicionados ou retirados produtos desta lista. Atualize para poder avançar.</p>
+                    </div>
+                </div>
+                <button onclick="actionBuyerAcceptUpdate()" class="w-full bg-zinc-950 hover:bg-zinc-800 text-white py-2.5 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider shadow-md transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrows-rotate text-emerald-400"></i> Atualizar Lista para Avançar
+                </button>
+            </div>
+        </div>
+
+        <!-- Conteúdo Principal do Comprador -->
+        <main class="flex-1 min-h-0 overflow-y-auto pb-40 p-3 sm:p-5">
+            <div class="max-w-xl mx-auto pb-16">
+                <!-- SUB-ABA 1: LISTA DE COMPRAS INTERATIVA -->
+                <div id="buyer-view-lista" class="space-y-3 block"></div>
+
+                <!-- SUB-ABA 2: HISTÓRICO SIMPLIFICADO (NÚMERO DA LISTA + DATA DE FECHAMENTO) -->
+                <div id="buyer-view-historico" class="space-y-3 hidden"></div>
+            </div>
+        </main>
+
+        <!-- Navegação Inferior Exclusiva do Comprador -->
+        <nav class="fixed bottom-0 inset-x-0 bg-zinc-950 text-zinc-400 border-t border-zinc-800 flex justify-around items-center h-16 z-30 px-2 shadow-2xl">
+            <button onclick="switchBuyerTab('lista')" id="buyer-tab-lista" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-white transition-all">
+                <div class="relative flex items-center justify-center w-10 h-6 rounded-full bg-emerald-500/20 text-emerald-400" id="buyer-pill-lista">
+                    <i class="fa-solid fa-list-check text-sm"></i>
+                </div>
+                <span class="text-[11px] font-bold tracking-tight">Lista de Compras</span>
+            </button>
+
+            <button onclick="switchBuyerTab('historico')" id="buyer-tab-historico" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-zinc-400 transition-all">
+                <div class="relative flex items-center justify-center w-10 h-6 rounded-full" id="buyer-pill-historico">
+                    <i class="fa-solid fa-clock-rotate-left text-sm"></i>
+                </div>
+                <span class="text-[11px] font-bold tracking-tight">Histórico de Listas</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- SISTEMA PRINCIPAL COMPLETO (ADMINISTRAÇÃO / COZINHA)                  -->
+    <!-- ===================================================================== -->
+    <header id="admin-header" class="bg-zinc-950 text-white px-4 py-3 flex justify-between items-center z-30 shadow-md shrink-0">
         <div class="flex items-center gap-2.5">
             <div class="w-8 h-8 rounded-lg bg-emerald-500 text-zinc-950 flex items-center justify-center font-black shadow-sm shadow-emerald-500/30">
-                <i class="fa-solid fa-utensils text-sm"></i>
+                <i class="fa-solid fa-cart-shopping text-sm"></i>
             </div>
             <div>
                 <div class="flex items-center gap-2">
@@ -96,8 +169,8 @@
     </header>
 
     <!-- ÁREA PRINCIPAL -->
-    <main class="flex-1 overflow-y-auto pb-24" id="main-content">
-        <div class="max-w-7xl mx-auto p-3 sm:p-5">
+    <main class="flex-1 min-h-0 overflow-y-auto pb-40" id="main-content">
+        <div class="max-w-7xl mx-auto p-3 sm:p-5 pb-20">
 
             <!-- VIEW 1: ESTOQUE & DADOS -->
             <div id="view-estoque" class="block">
@@ -201,7 +274,7 @@
     </div>
 
     <!-- BARRA DE NAVEGAÇÃO INFERIOR -->
-    <nav class="fixed bottom-0 inset-x-0 bg-zinc-950 text-zinc-400 border-t border-zinc-800 flex justify-around items-center h-16 z-30 px-1 shadow-2xl">
+    <nav id="admin-nav" class="fixed bottom-0 inset-x-0 bg-zinc-950 text-zinc-400 border-t border-zinc-800 flex justify-around items-center h-16 z-30 px-1 shadow-2xl">
         <button onclick="switchTab('estoque')" id="tab-estoque" class="flex-1 py-2 flex flex-col items-center justify-center gap-1 text-white transition-all">
             <div class="relative flex items-center justify-center w-10 h-6 rounded-full bg-emerald-500/20 text-emerald-400" id="nav-pill-estoque">
                 <i class="fa-solid fa-boxes-stacked text-sm"></i>
@@ -258,6 +331,11 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Verifica se o link foi aberto no Modo Comprador (?modo=comprador)
+        const urlParams = new URLSearchParams(window.location.search);
+        const IS_BUYER_MODE = urlParams.get('modo') === 'comprador';
+        const INITIAL_BUYER_CAT = urlParams.get('forn') || 'ALL';
+
         const SEED_CATEGORIES = [
             { id: 'c1', name: 'Belave', color: '#ef4444', order: 1 },
             { id: 'c2', name: 'Casa', color: '#f97316', order: 2 },
@@ -289,8 +367,27 @@
             emojis: [],
             measureMemory: {},
             templates: [],
-            collapsedCats: {}, // Persistência de abas abertas/fechadas
+            collapsedCats: {},
+            buyerPortal: {
+                version: 0,
+                listNumber: 1,
+                lastSentAt: null,
+                items: [],          // [{ key, id, categoryId, catName, catColor, name, qty, type, urgent }]
+                checkedMap: {},     // { [key]: boolean }
+                customOrder: [],    // [key1, key2, ...]
+                closedHistory: []   // [{ listNumber: 1, closedAt: '27/10/2026 às 18:30' }]
+            },
             yearResetPending: false
+        };
+
+        // Estado local do comprador
+        let buyerSession = {
+            currentTab: 'lista',
+            activeCatFilter: INITIAL_BUYER_CAT,
+            acknowledgedVersion: null,
+            acknowledgedSnapshot: null,
+            pendingDiff: null,
+            touchDragKey: null
         };
 
         let undoStack = [];
@@ -434,6 +531,13 @@
         }
 
         async function init() {
+            if (IS_BUYER_MODE) {
+                document.getElementById('admin-header').classList.add('hidden');
+                document.getElementById('main-content').classList.add('hidden');
+                document.getElementById('admin-nav').classList.add('hidden');
+                document.getElementById('buyer-app-shell').classList.remove('hidden');
+            }
+
             await loadData();
             loadCollapsedPrefs();
             loadStacks();
@@ -450,6 +554,13 @@
             }
             if (!state.emojis || state.emojis.length === 0) {
                 state.emojis = ['🍅','🧅','🥔','🥬','🥩','🍗','🐟','🥚','🧀','🧈','🥛','🍞','🧊','📦','✅','❌','⚠️','🚨','🚚'];
+            }
+
+            if (IS_BUYER_MODE) {
+                initBuyerPortalSession();
+                startRealtimeListener();
+                renderBuyerPortal();
+                return;
             }
 
             saveData();
@@ -470,6 +581,24 @@
             if (!state.measureMemory) state.measureMemory = {};
             if (!state.templates) state.templates = [];
             if (!state.collapsedCats) state.collapsedCats = {};
+            if (!state.buyerPortal) {
+                state.buyerPortal = {
+                    version: 0,
+                    listNumber: 1,
+                    lastSentAt: null,
+                    items: [],
+                    checkedMap: {},
+                    customOrder: [],
+                    closedHistory: []
+                };
+            }
+            if (!state.buyerPortal.items) state.buyerPortal.items = [];
+            if (!state.buyerPortal.checkedMap) state.buyerPortal.checkedMap = {};
+            if (!state.buyerPortal.customOrder) state.buyerPortal.customOrder = [];
+            if (!state.buyerPortal.closedHistory) state.buyerPortal.closedHistory = [];
+            if (!state.buyerPortal.listNumber) state.buyerPortal.listNumber = 1;
+            if (state.buyerPortal.version === undefined) state.buyerPortal.version = 0;
+
             uiState.collapsedCats = state.collapsedCats;
             if (state.lastBackup !== undefined) delete state.lastBackup;
 
@@ -490,6 +619,13 @@
                     if (docSnap.exists && !docSnap.metadata.hasPendingWrites && !isSavingToCloud) {
                         state = docSnap.data();
                         sanitizeStateStructure();
+
+                        if (IS_BUYER_MODE) {
+                            checkBuyerIncomingChanges();
+                            renderBuyerPortal();
+                            return;
+                        }
+
                         loadCollapsedPrefs();
                         localStorage.setItem('chefstock_pro_v3_data', JSON.stringify(state));
                         updateBadge();
@@ -505,6 +641,593 @@
             } catch (e) {
                 setSyncIndicator('offline');
             }
+        }
+
+        // =====================================================================
+        // LÓGICA DO PORTAL DO COMPRADOR (LINK WHATSAPP, CHECK, DRAG & HISTÓRICO)
+        // =====================================================================
+        function getBuyerLinkUrl(targetCatId = null) {
+            const base = window.location.origin + window.location.pathname;
+            return targetCatId ? `${base}?modo=comprador&forn=${encodeURIComponent(targetCatId)}` : `${base}?modo=comprador`;
+        }
+
+        function buildCurrentBuyerItemsSnapshot() {
+            const sortedCats = state.categories.slice().sort((a, b) => a.order - b.order);
+            const snapshot = [];
+            sortedCats.forEach(cat => {
+                const catProds = state.products.filter(p => p.categoryId === cat.id && p.qty > 0 && !p.pending);
+                catProds.forEach(p => {
+                    snapshot.push({
+                        key: `${p.categoryId}__${normalizeText(p.name)}`,
+                        id: p.id,
+                        categoryId: p.categoryId,
+                        catName: cat.name,
+                        catColor: cat.color,
+                        name: p.name,
+                        qty: p.qty,
+                        type: p.type,
+                        urgent: !!p.urgent
+                    });
+                });
+            });
+            return snapshot;
+        }
+
+        function publishBuyerListSnapshot() {
+            const newItems = buildCurrentBuyerItemsSnapshot();
+            const oldItems = state.buyerPortal.items || [];
+
+            const oldSignature = JSON.stringify(oldItems.map(i => `${i.key}:${i.qty}:${i.type}`));
+            const newSignature = JSON.stringify(newItems.map(i => `${i.key}:${i.qty}:${i.type}`));
+
+            state.buyerPortal.items = newItems;
+            state.buyerPortal.lastSentAt = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            const validKeys = new Set(newItems.map(i => i.key));
+            const keptOrder = (state.buyerPortal.customOrder || []).filter(k => validKeys.has(k));
+            newItems.forEach(i => {
+                if (!keptOrder.includes(i.key)) keptOrder.push(i.key);
+            });
+            state.buyerPortal.customOrder = keptOrder;
+
+            if (oldSignature !== newSignature || state.buyerPortal.version === 0) {
+                state.buyerPortal.version = (state.buyerPortal.version || 0) + 1;
+            }
+            saveData();
+        }
+
+        function initBuyerPortalSession() {
+            if ((!state.buyerPortal.items || state.buyerPortal.items.length === 0) && state.products.some(p => p.qty > 0 && !p.pending)) {
+                state.buyerPortal.items = buildCurrentBuyerItemsSnapshot();
+                state.buyerPortal.customOrder = state.buyerPortal.items.map(i => i.key);
+                state.buyerPortal.version = state.buyerPortal.version || 1;
+            }
+
+            try {
+                const savedSnap = localStorage.getItem('chefstock_buyer_ack_snapshot');
+                const savedVer = localStorage.getItem('chefstock_buyer_ack_version');
+                if (savedSnap && savedVer !== null) {
+                    buyerSession.acknowledgedSnapshot = JSON.parse(savedSnap);
+                    buyerSession.acknowledgedVersion = parseInt(savedVer, 10);
+                    validateBuyerActiveCatFilter();
+                    checkBuyerIncomingChanges();
+                    return;
+                }
+            } catch (e) {}
+
+            buyerSession.acknowledgedVersion = state.buyerPortal.version || 0;
+            buyerSession.acknowledgedSnapshot = JSON.parse(JSON.stringify(state.buyerPortal.items || []));
+            validateBuyerActiveCatFilter();
+            saveBuyerAckLocal();
+        }
+
+        function validateBuyerActiveCatFilter() {
+            const allItems = buyerSession.acknowledgedSnapshot || [];
+            if (buyerSession.activeCatFilter !== 'ALL') {
+                const hasItemsInSelected = allItems.some(i => i.categoryId === buyerSession.activeCatFilter);
+                if (!hasItemsInSelected) {
+                    buyerSession.activeCatFilter = 'ALL';
+                }
+            }
+        }
+
+        function setBuyerCatFilter(catId) {
+            buyerSession.activeCatFilter = catId;
+            renderBuyerPortal();
+        }
+
+        function saveBuyerAckLocal() {
+            try {
+                localStorage.setItem('chefstock_buyer_ack_version', String(buyerSession.acknowledgedVersion || 0));
+                localStorage.setItem('chefstock_buyer_ack_snapshot', JSON.stringify(buyerSession.acknowledgedSnapshot || []));
+            } catch (e) {}
+        }
+
+        function checkBuyerIncomingChanges() {
+            const incomingItems = state.buyerPortal.items || [];
+            const currentAck = buyerSession.acknowledgedSnapshot || [];
+
+            if (!buyerSession.acknowledgedSnapshot) {
+                buyerSession.acknowledgedVersion = state.buyerPortal.version || 0;
+                buyerSession.acknowledgedSnapshot = JSON.parse(JSON.stringify(incomingItems));
+                saveBuyerAckLocal();
+                return;
+            }
+
+            if (incomingItems.length === 0 && currentAck.length === 0) {
+                buyerSession.pendingDiff = null;
+                return;
+            }
+
+            const oldMap = new Map(currentAck.map(i => [i.key, i]));
+            const newMap = new Map(incomingItems.map(i => [i.key, i]));
+
+            const added = [];
+            const removed = [];
+            const changed = [];
+
+            newMap.forEach((item, key) => {
+                if (!oldMap.has(key)) {
+                    added.push(item);
+                } else {
+                    const prev = oldMap.get(key);
+                    if (prev.qty !== item.qty || prev.type !== item.type) {
+                        changed.push({ item, oldQty: prev.qty, newQty: item.qty });
+                    }
+                }
+            });
+
+            oldMap.forEach((item, key) => {
+                if (!newMap.has(key)) {
+                    removed.push(item);
+                }
+            });
+
+            if (added.length > 0 || removed.length > 0 || changed.length > 0) {
+                buyerSession.pendingDiff = { added, removed, changed };
+            } else {
+                buyerSession.pendingDiff = null;
+                buyerSession.acknowledgedVersion = state.buyerPortal.version;
+                buyerSession.acknowledgedSnapshot = JSON.parse(JSON.stringify(incomingItems));
+                saveBuyerAckLocal();
+            }
+        }
+
+        function actionBuyerAcceptUpdate() {
+            buyerSession.pendingDiff = null;
+            buyerSession.acknowledgedVersion = state.buyerPortal.version || 0;
+            buyerSession.acknowledgedSnapshot = JSON.parse(JSON.stringify(state.buyerPortal.items || []));
+            validateBuyerActiveCatFilter();
+            saveBuyerAckLocal();
+            renderBuyerPortal();
+        }
+
+        function switchBuyerTab(tabName) {
+            buyerSession.currentTab = tabName;
+            ['lista', 'historico'].forEach(t => {
+                document.getElementById(`buyer-tab-${t}`).classList.replace('text-white', 'text-zinc-400');
+                document.getElementById(`buyer-pill-${t}`).classList.remove('bg-emerald-500/20', 'text-emerald-400');
+                document.getElementById(`buyer-view-${t}`).classList.add('hidden');
+            });
+            document.getElementById(`buyer-tab-${tabName}`).classList.replace('text-zinc-400', 'text-white');
+            document.getElementById(`buyer-pill-${tabName}`).classList.add('bg-emerald-500/20', 'text-emerald-400');
+            document.getElementById(`buyer-view-${tabName}`).classList.remove('hidden');
+            renderBuyerPortal();
+        }
+
+        function toggleBuyerItemCheck(itemKey) {
+            if (buyerSession.pendingDiff) return;
+            if (!state.buyerPortal.checkedMap) state.buyerPortal.checkedMap = {};
+            const newState = !state.buyerPortal.checkedMap[itemKey];
+            state.buyerPortal.checkedMap[itemKey] = newState;
+
+            const targetItem = (state.buyerPortal.items || []).find(i => i.key === itemKey);
+            if (targetItem) {
+                const mainProd = state.products.find(p => p.id === targetItem.id || (p.categoryId === targetItem.categoryId && normalizeText(p.name) === normalizeText(targetItem.name)));
+                if (mainProd) mainProd.checked = newState;
+            }
+
+            saveData();
+            renderBuyerPortal();
+
+            if (newState) {
+                const allAckItems = buyerSession.acknowledgedSnapshot || [];
+                const currentScopeItems = buyerSession.activeCatFilter === 'ALL'
+                    ? allAckItems
+                    : allAckItems.filter(i => i.categoryId === buyerSession.activeCatFilter);
+
+                if (currentScopeItems.length > 0 && currentScopeItems.every(i => state.buyerPortal.checkedMap[i.key])) {
+                    setTimeout(() => {
+                        actionBuyerCloseList(true);
+                    }, 180);
+                }
+            }
+        }
+
+        // Reordenação puxando (Drag & Drop Mouse + Touch) no Modo Comprador
+        function reorderBuyerItems(draggedKey, targetKey) {
+            if (!draggedKey || !targetKey || draggedKey === targetKey) return;
+            const currentOrder = (state.buyerPortal.customOrder && state.buyerPortal.customOrder.length > 0)
+                ? state.buyerPortal.customOrder.slice()
+                : (state.buyerPortal.items || []).map(i => i.key);
+
+            if (!currentOrder.includes(draggedKey)) currentOrder.push(draggedKey);
+            if (!currentOrder.includes(targetKey)) currentOrder.push(targetKey);
+
+            const fromIdx = currentOrder.indexOf(draggedKey);
+            const toIdx = currentOrder.indexOf(targetKey);
+            if (fromIdx === -1 || toIdx === -1) return;
+
+            const [moved] = currentOrder.splice(fromIdx, 1);
+            const newToIdx = currentOrder.indexOf(targetKey);
+            currentOrder.splice(fromIdx < toIdx ? newToIdx + 1 : newToIdx, 0, moved);
+
+            state.buyerPortal.customOrder = currentOrder;
+
+            if (buyerSession.acknowledgedSnapshot) {
+                buyerSession.acknowledgedSnapshot.sort((a, b) => currentOrder.indexOf(a.key) - currentOrder.indexOf(b.key));
+                saveBuyerAckLocal();
+            }
+
+            saveData();
+            renderBuyerPortal();
+        }
+
+        function handleBuyerDragStart(e, itemKey) {
+            e.dataTransfer.setData('text/plain', itemKey);
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
+        function handleBuyerDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('prod-drag-over');
+        }
+
+        function handleBuyerDragLeave(e) {
+            e.currentTarget.classList.remove('prod-drag-over');
+        }
+
+        function handleBuyerDrop(e, targetKey) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('prod-drag-over');
+            const draggedKey = e.dataTransfer.getData('text/plain');
+            reorderBuyerItems(draggedKey, targetKey);
+        }
+
+        function startBuyerTouchDrag(e, itemKey) {
+            if (buyerSession.pendingDiff) return;
+            buyerSession.touchDragKey = itemKey;
+            const row = document.querySelector(`[data-buyer-key="${itemKey}"]`);
+            if (row) row.classList.add('dragging');
+        }
+
+        function moveBuyerTouchDrag(e) {
+            if (!buyerSession.touchDragKey) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            document.querySelectorAll('.buyer-item-row').forEach(el => el.classList.remove('prod-drag-over'));
+            const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetRow = elUnder ? elUnder.closest('.buyer-item-row') : null;
+            if (targetRow && targetRow.dataset.buyerKey !== buyerSession.touchDragKey) {
+                targetRow.classList.add('prod-drag-over');
+            }
+        }
+
+        function endBuyerTouchDrag(e) {
+            if (!buyerSession.touchDragKey) return;
+            const touch = e.changedTouches[0];
+            const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetRow = elUnder ? elUnder.closest('.buyer-item-row') : null;
+
+            document.querySelectorAll('.buyer-item-row').forEach(el => el.classList.remove('dragging', 'prod-drag-over'));
+
+            if (targetRow && targetRow.dataset.buyerKey && targetRow.dataset.buyerKey !== buyerSession.touchDragKey) {
+                reorderBuyerItems(buyerSession.touchDragKey, targetRow.dataset.buyerKey);
+            }
+            buyerSession.touchDragKey = null;
+        }
+
+        function actionBuyerCloseList(autoTriggered = false) {
+            const allAck = buyerSession.acknowledgedSnapshot || [];
+            const isSingleCat = buyerSession.activeCatFilter !== 'ALL';
+            const itemsToClear = isSingleCat
+                ? allAck.filter(i => i.categoryId === buyerSession.activeCatFilter)
+                : allAck;
+
+            if (itemsToClear.length === 0) {
+                showModal("Lista Vazia", "<p class='text-xs text-zinc-600'>Não há produtos ativos nesta lista para finalizar.</p>", "OK", "bg-zinc-950", () => {});
+                return;
+            }
+
+            const currentNum = state.buyerPortal.listNumber || 1;
+            const catObj = isSingleCat ? state.categories.find(c => c.id === buyerSession.activeCatFilter) : null;
+            const scopeLabel = catObj ? `Lista #${currentNum} (${catObj.name})` : `Lista #${currentNum}`;
+
+            const modalTitle = autoTriggered ? "Todos os Itens Comprados! 🎉" : `Finalizar / Zerar ${scopeLabel}`;
+            const modalBody = autoTriggered
+                ? `<div class="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl text-emerald-950 text-xs leading-relaxed">
+                       <i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>
+                       Você marcou todos os produtos de <b>${scopeLabel}</b>! Deseja finalizar e encerrar esta lista agora?
+                   </div>`
+                : `<p class="text-sm text-zinc-700">Deseja finalizar e zerar a <b>${scopeLabel}</b>?</p>
+                   <p class="text-xs text-zinc-500 mt-1.5">Ela será registrada no Histórico com o número da lista e a data de hoje.</p>`;
+
+            showModal(
+                modalTitle,
+                modalBody,
+                "Sim, Finalizar Lista",
+                autoTriggered ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700",
+                () => {
+                    const closedDate = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    if (!state.buyerPortal.closedHistory) state.buyerPortal.closedHistory = [];
+
+                    state.buyerPortal.closedHistory.push({
+                        listNumber: currentNum,
+                        closedAt: closedDate
+                    });
+
+                    state.buyerPortal.listNumber = currentNum + 1;
+
+                    if (isSingleCat) {
+                        const targetCat = buyerSession.activeCatFilter;
+                        state.buyerPortal.items = (state.buyerPortal.items || []).filter(i => i.categoryId !== targetCat);
+                    } else {
+                        state.buyerPortal.items = [];
+                        state.buyerPortal.checkedMap = {};
+                        state.buyerPortal.customOrder = [];
+                    }
+
+                    state.buyerPortal.version = (state.buyerPortal.version || 0) + 1;
+                    buyerSession.pendingDiff = null;
+                    buyerSession.acknowledgedVersion = state.buyerPortal.version;
+                    buyerSession.acknowledgedSnapshot = JSON.parse(JSON.stringify(state.buyerPortal.items || []));
+                    validateBuyerActiveCatFilter();
+                    saveBuyerAckLocal();
+                    saveData();
+
+                    if ((state.buyerPortal.items || []).length === 0) {
+                        switchBuyerTab('historico');
+                    } else {
+                        renderBuyerPortal();
+                    }
+                }
+            );
+        }
+
+        function renderBuyerPortal() {
+            if (!IS_BUYER_MODE) return;
+
+            const listNumBadge = document.getElementById('buyer-list-number-badge');
+            if (listNumBadge) listNumBadge.innerText = `Lista #${state.buyerPortal.listNumber || 1}`;
+
+            const banner = document.getElementById('buyer-update-banner');
+            const bannerDetails = document.getElementById('buyer-update-details');
+            if (buyerSession.pendingDiff && (buyerSession.pendingDiff.added.length > 0 || buyerSession.pendingDiff.removed.length > 0 || buyerSession.pendingDiff.changed.length > 0)) {
+                const { added, removed, changed } = buyerSession.pendingDiff;
+                const parts = [];
+                if (added.length > 0) parts.push(`+${added.length} adicionado(s): ${added.map(a => a.name).join(', ')}`);
+                if (removed.length > 0) parts.push(`-${removed.length} retirado(s): ${removed.map(r => r.name).join(', ')}`);
+                if (changed.length > 0) parts.push(`${changed.length} quantidade(s) alterada(s): ${changed.map(c => `${c.item.name} (${c.oldQty} → ${c.newQty})`).join(', ')}`);
+
+                bannerDetails.innerText = parts.join(' • ') + '. Clique abaixo para atualizar e continuar.';
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+
+            const listaContainer = document.getElementById('buyer-view-lista');
+            const allAckItems = (buyerSession.acknowledgedSnapshot || []).slice();
+
+            const orderArr = state.buyerPortal.customOrder || [];
+            allAckItems.sort((a, b) => {
+                const ia = orderArr.indexOf(a.key);
+                const ib = orderArr.indexOf(b.key);
+                if (ia === -1 && ib === -1) return 0;
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+            });
+
+            if (allAckItems.length === 0) {
+                listaContainer.innerHTML = `
+                    <div class="bg-white p-10 rounded-2xl border border-zinc-200/80 text-center shadow-2xs mt-4">
+                        <div class="w-14 h-14 bg-zinc-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-zinc-400">
+                            <i class="fa-solid fa-cart-shopping text-2xl"></i>
+                        </div>
+                        <p class="text-sm font-extrabold text-zinc-800">Nenhum produto pendente na lista</p>
+                        <p class="text-xs text-zinc-400 mt-1">Aguarde o envio de uma nova lista ou consulte a aba Histórico abaixo.</p>
+                    </div>
+                `;
+            } else {
+                const activeSupplierMap = new Map();
+                allAckItems.forEach(item => {
+                    if (!activeSupplierMap.has(item.categoryId)) {
+                        activeSupplierMap.set(item.categoryId, {
+                            id: item.categoryId,
+                            name: item.catName || 'Fornecedor',
+                            color: item.catColor || '#10b981',
+                            count: 0
+                        });
+                    }
+                    activeSupplierMap.get(item.categoryId).count++;
+                });
+                const activeSuppliers = Array.from(activeSupplierMap.values());
+
+                if (buyerSession.activeCatFilter !== 'ALL' && !activeSupplierMap.has(buyerSession.activeCatFilter)) {
+                    buyerSession.activeCatFilter = 'ALL';
+                }
+
+                const workingItems = buyerSession.activeCatFilter === 'ALL'
+                    ? allAckItems
+                    : allAckItems.filter(i => i.categoryId === buyerSession.activeCatFilter);
+
+                const checkedCount = workingItems.filter(i => state.buyerPortal.checkedMap && state.buyerPortal.checkedMap[i.key]).length;
+                const progressPct = workingItems.length > 0 ? Math.round((checkedCount / workingItems.length) * 100) : 0;
+                const isLockedByUpdate = !!buyerSession.pendingDiff;
+
+                let supplierTabsHtml = '';
+                if (activeSuppliers.length > 1) {
+                    supplierTabsHtml = `
+                        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                            <button onclick="setBuyerCatFilter('ALL')" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-extrabold transition border ${buyerSession.activeCatFilter === 'ALL' ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs' : 'bg-white text-zinc-700 border-zinc-200'}">
+                                Todos (${allAckItems.length})
+                            </button>
+                            ${activeSuppliers.map(s => {
+                                const isAct = buyerSession.activeCatFilter === s.id;
+                                return `
+                                    <button onclick="setBuyerCatFilter('${s.id}')" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition border ${isAct ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs' : 'bg-white text-zinc-700 border-zinc-200'}">
+                                        <span class="w-2 h-2 rounded-full" style="background-color: ${s.color}"></span>
+                                        <span>${s.name}</span>
+                                        <span class="text-[10px] text-zinc-400">${s.count}</span>
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                let html = `
+                    ${supplierTabsHtml}
+
+                    <!-- Barra de Progresso da Compra -->
+                    <div class="bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-2xs">
+                        <div class="flex justify-between items-center text-xs font-extrabold text-zinc-800 mb-1.5">
+                            <span>Progresso da Compra</span>
+                            <span class="text-emerald-600">${checkedCount} de ${workingItems.length} comprados (${progressPct}%)</span>
+                        </div>
+                        <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-500 transition-all duration-300" style="width: ${progressPct}%"></div>
+                        </div>
+                        <p class="text-[10px] text-zinc-400 font-semibold mt-2 flex items-center justify-between">
+                            <span><i class="fa-solid fa-hand-pointer mr-1"></i>Toque no item para riscar</span>
+                            <span><i class="fa-solid fa-arrows-up-down mr-1"></i>Segure em ☰ para organizar</span>
+                        </p>
+                    </div>
+
+                    <div class="space-y-3 ${isLockedByUpdate ? 'opacity-40 pointer-events-none select-none' : ''}">
+                `;
+
+                const suppliersToDisplay = buyerSession.activeCatFilter === 'ALL'
+                    ? activeSuppliers
+                    : activeSuppliers.filter(s => s.id === buyerSession.activeCatFilter);
+
+                suppliersToDisplay.forEach(sup => {
+                    const supItems = workingItems.filter(i => i.categoryId === sup.id);
+                    if (supItems.length === 0) return;
+                    const supChecked = supItems.filter(i => state.buyerPortal.checkedMap && state.buyerPortal.checkedMap[i.key]).length;
+                    const bgLight = hexToRgba(sup.color, 0.08);
+
+                    html += `
+                        <div class="bg-white rounded-2xl shadow-2xs border border-zinc-200/90 overflow-hidden" style="border-left: 5px solid ${sup.color}">
+                            <div class="px-3.5 py-2.5 border-b border-zinc-100 flex items-center justify-between" style="background-color: ${bgLight}">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${sup.color}"></span>
+                                    <h3 class="font-extrabold text-xs text-zinc-900 uppercase tracking-wide">${sup.name}</h3>
+                                </div>
+                                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white border border-zinc-200 text-zinc-600">${supChecked}/${supItems.length} comprados</span>
+                            </div>
+                            <div class="divide-y divide-zinc-100">
+                    `;
+
+                    supItems.forEach(item => {
+                        const isChecked = !!(state.buyerPortal.checkedMap && state.buyerPortal.checkedMap[item.key]);
+                        html += `
+                            <div class="buyer-item-row px-3.5 py-3 flex items-center justify-between gap-3 transition-all ${isChecked ? 'checked-delivery-row opacity-75' : (item.urgent ? 'bg-rose-50/70' : 'bg-white')}"
+                                 data-buyer-key="${item.key}"
+                                 draggable="true"
+                                 ondragstart="handleBuyerDragStart(event, '${item.key}')"
+                                 ondragover="handleBuyerDragOver(event)"
+                                 ondragleave="handleBuyerDragLeave(event)"
+                                 ondrop="handleBuyerDrop(event, '${item.key}')"
+                                 ondragend="this.classList.remove('dragging')">
+
+                                <div class="flex items-center gap-3 flex-1 min-w-0">
+                                    <span class="text-zinc-300 hover:text-zinc-600 cursor-grab active:cursor-grabbing px-1 py-1 touch-none shrink-0"
+                                          title="Puxar para organizar"
+                                          ontouchstart="startBuyerTouchDrag(event, '${item.key}')"
+                                          ontouchmove="moveBuyerTouchDrag(event)"
+                                          ontouchend="endBuyerTouchDrag(event)">
+                                        <i class="fa-solid fa-bars text-sm"></i>
+                                    </span>
+
+                                    <button type="button" onclick="toggleBuyerItemCheck('${item.key}')" class="w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${isChecked ? 'bg-emerald-500 border-emerald-500 text-zinc-950' : 'bg-white border-zinc-300 text-transparent'}">
+                                        <i class="fa-solid fa-check text-xs font-black"></i>
+                                    </button>
+
+                                    <div onclick="toggleBuyerItemCheck('${item.key}')" class="min-w-0 flex-1 cursor-pointer">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-extrabold text-sm ${isChecked ? 'line-through text-zinc-400' : 'text-zinc-900'}">${item.name}</span>
+                                            ${item.urgent ? `<span class="text-[9px] uppercase font-extrabold bg-rose-600 text-white px-1.5 py-0.5 rounded">Urgente</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div onclick="toggleBuyerItemCheck('${item.key}')" class="shrink-0 bg-zinc-100 border border-zinc-200 px-3 py-1.5 rounded-xl text-right cursor-pointer">
+                                    <span class="font-extrabold text-sm ${isChecked ? 'line-through text-zinc-400' : 'text-zinc-900'}">${item.qty}</span>
+                                    <span class="text-[10px] font-bold text-zinc-500 block leading-none mt-0.5">${item.type}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div></div>`;
+                });
+
+                html += `<div class="h-16"></div></div>`;
+                listaContainer.innerHTML = html;
+            }
+
+            // Renderiza Aba 2: Histórico Simplificado do Comprador (Apenas Numeração da Lista + Dia que foi fechada)
+            const histContainer = document.getElementById('buyer-view-historico');
+            const closedList = (state.buyerPortal.closedHistory || []).slice().reverse();
+
+            if (closedList.length === 0) {
+                histContainer.innerHTML = `
+                    <div class="bg-white p-10 rounded-2xl border border-zinc-200/80 text-center text-zinc-400 text-xs font-bold mt-4">
+                        Nenhuma lista foi fechada ainda.
+                    </div>
+                `;
+            } else {
+                let hHtml = `
+                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xs overflow-hidden mb-16">
+                        <div class="bg-zinc-950 text-white px-4 py-3 text-xs font-extrabold uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Histórico de Listas Fechadas
+                        </div>
+                        <div class="divide-y divide-zinc-100">
+                `;
+                closedList.forEach(entry => {
+                    hHtml += `
+                        <div class="px-4 py-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-700 font-extrabold text-xs flex items-center justify-center">#${entry.listNumber}</span>
+                                <span class="font-extrabold text-sm text-zinc-900">Lista #${entry.listNumber}</span>
+                            </div>
+                            <div class="text-xs font-bold text-zinc-500 flex items-center gap-1.5">
+                                <i class="fa-regular fa-calendar-check text-emerald-600"></i>
+                                <span>${entry.closedAt}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                hHtml += `</div></div>`;
+                histContainer.innerHTML = hHtml;
+            }
+        }
+
+        function actionCopyBuyerLink(targetCatId = null) {
+            publishBuyerListSnapshot();
+            const link = getBuyerLinkUrl(targetCatId);
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(link);
+            }
+            showModal(
+                "Link do Comprador Pronto",
+                `<p class="text-xs text-zinc-600 mb-2">Quem abrir este link terá acesso <b>apenas</b> à lista de compras com checkbox (sem ver o resto do sistema):</p>
+                 <input type="text" readonly value="${link}" onclick="this.select()" class="w-full bg-zinc-100 border border-zinc-300 rounded-xl p-2.5 text-xs font-bold text-zinc-800 outline-none">`,
+                "Abrir Modo Comprador",
+                "bg-emerald-600 hover:bg-emerald-700",
+                () => { window.open(link, '_blank'); }
+            );
         }
 
         function refreshCurrentTabView() {
@@ -636,7 +1359,6 @@
         function setCatFilter(catId) { uiState.activeCatFilter = catId; renderEstoque(); }
         function setMasterGroupFilter(gName) { uiState.activeMasterGroup = gName; renderMasterData(); }
 
-        // Alterna aba do fornecedor e salva permanentemente como o utilizador deixou
         function toggleCatCollapse(catId) {
             if (!state.collapsedCats) state.collapsedCats = {};
             state.collapsedCats[catId] = !state.collapsedCats[catId];
@@ -680,7 +1402,7 @@
             document.getElementById('u-modal').classList.remove('hidden');
         }
 
-        // --- RENOMEAÇÃO GLOBAL DE PRODUTO (ATUALIZA MASTER + FORNECEDORES + MODELOS + NOTAS) ---
+        // --- RENOMEAÇÃO GLOBAL DE PRODUTO ---
         function renameProductGlobally(oldName, rawNewName) {
             const newName = (rawNewName || '').trim();
             if (!newName || newName === oldName) return false;
@@ -688,17 +1410,14 @@
             pushStateToUndo();
             const normOld = normalizeText(oldName);
 
-            // 1. Atualiza no Catálogo Master
             state.masterData.forEach(m => {
                 if (normalizeText(m.name) === normOld) m.name = newName;
             });
 
-            // 2. Atualiza em todas as listas de fornecedores
             state.products.forEach(p => {
                 if (normalizeText(p.name) === normOld) p.name = newName;
             });
 
-            // 3. Atualiza nos Modelos de Pedidos salvos
             if (state.templates) {
                 state.templates.forEach(t => {
                     t.items.forEach(it => {
@@ -707,12 +1426,10 @@
                 });
             }
 
-            // 4. Atualiza memória de unidade de medida
             if (state.measureMemory && state.measureMemory[normOld]) {
                 state.measureMemory[normalizeText(newName)] = state.measureMemory[normOld];
             }
 
-            // 5. Atualiza menções @ nas notas
             const escapedOld = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const rgxOld = new RegExp(`@${escapedOld}(?![\\wÀ-ÿ])`, 'gi');
             state.notas.forEach(n => {
@@ -725,7 +1442,6 @@
             return true;
         }
 
-        // Pergunta primeiro ao clicar no nome na lista do fornecedor (evita clique sem querer)
         function actionClickProductNameInSupplier(prodId) {
             const prod = state.products.find(p => p.id === prodId);
             if (!prod) return;
@@ -764,7 +1480,6 @@
             }, 50);
         }
 
-        // --- SEGURAR (LONG PRESS) NO NOME DO CATÁLOGO MASTER PARA RENOMEAR ---
         function startMasterItemLongPress(e, masterId) {
             clearMasterItemLongPress();
             longPressTimer = setTimeout(() => {
@@ -782,7 +1497,6 @@
             }
         }
 
-        // --- MUDAR ITEM DE CATEGORIA DENTRO DO CATÁLOGO MASTER (POR BOTÃO OU ARRASTANDO) ---
         function actionChangeMasterItemGroup(masterId) {
             const item = state.masterData.find(m => m.id === masterId);
             if (!item) return;
@@ -866,7 +1580,6 @@
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
         }
 
-        // --- DRAG & DROP DE CATEGORIAS, CATÁLOGO E REORDENAÇÃO INTERNA DE PRODUTOS ---
         function handleDragStart(e, type, idOrIndex) {
             clearMasterItemLongPress();
             e.stopPropagation();
@@ -920,10 +1633,8 @@
                     saveData(); renderEstoque();
                 }
             }
-            // Nota: se type === 'prod', ignoramos o drop em outra categoria para impedir que mude de lista
         }
 
-        // Reordena produtos APENAS dentro da mesma categoria de fornecedor
         function handleProdDragOver(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -951,7 +1662,6 @@
             const draggedProd = state.products.find(p => p.id === draggedProdId);
             const targetProd = state.products.find(p => p.id === targetProdId);
 
-            // Garante que só organiza se ambos pertencerem à mesma lista de fornecedor
             if (!draggedProd || !targetProd) return;
             if (draggedProd.categoryId !== catId || targetProd.categoryId !== catId) return;
 
@@ -968,7 +1678,6 @@
             renderEstoque();
         }
 
-        // Suporte Touch (Telemóvel) para arrastar produtos para cima e para baixo na mesma lista
         function startProdTouchDrag(e, prodId, catId) {
             touchDragState = { active: true, prodId, catId };
             const card = document.querySelector(`[data-prod-id="${prodId}"]`);
@@ -1439,7 +2148,6 @@
                     catProducts = catProducts.filter(p => normalizeText(p.name).includes(normGlobalSearch));
                 }
 
-                // Mantém o estado fechado/aberto exatamente como o utilizador deixou salvo
                 const isCollapsed = !!(state.collapsedCats && state.collapsedCats[cat.id]) && !normGlobalSearch;
                 const bgLight = `rgba(${parseInt(cat.color.slice(1, 3), 16)}, ${parseInt(cat.color.slice(3, 5), 16)}, ${parseInt(cat.color.slice(5, 7), 16)}, 0.12)`;
                 
@@ -1506,7 +2214,6 @@
                              ${isSelected && !prod.urgent ? `style="background-color: ${bgLight}; border-color:${cat.color};"` : ''}>
                             <div class="flex justify-between items-center gap-2">
                                 <div class="flex-1 flex items-center gap-2 min-w-0">
-                                    <!-- Pega para Reordenar na Mesma Lista (PC e Telemóvel) -->
                                     <span class="text-zinc-300 hover:text-zinc-600 cursor-grab active:cursor-grabbing px-0.5 py-1 touch-none"
                                           title="Arraste para cima ou para baixo para organizar a lista"
                                           ontouchstart="startProdTouchDrag(event, '${prod.id}', '${cat.id}')"
@@ -1516,7 +2223,6 @@
                                     </span>
                                     <input type="checkbox" ${prod.selected ? 'checked' : ''} onchange="toggleProductSelection('${prod.id}')" class="w-4 h-4 accent-zinc-900 cursor-pointer shrink-0">
                                     <div class="min-w-0 flex-1 flex items-center">
-                                        <!-- Tocar no nome pergunta se deseja renomear globalmente -->
                                         <span onclick="actionClickProductNameInSupplier('${prod.id}')" class="font-bold text-zinc-900 text-sm truncate cursor-pointer hover:underline" title="Toque para alterar o nome">${prod.name}</span>
                                         ${mentionBadge}
                                     </div>
@@ -1552,6 +2258,7 @@
                 });
                 html += `</div></div>`;
             });
+            html += `<div class="h-20"></div>`;
             catContainer.innerHTML = html;
             renderMasterData();
             updateBulkBar();
@@ -1572,11 +2279,10 @@
             allGroups.forEach(gName => { groupChips += `<button onclick="setMasterGroupFilter('${gName}')" class="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold ${uiState.activeMasterGroup === gName ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-600'}">${gName}</button>`; });
             groupChips += `</div>`;
 
-            let html = groupChips + `<div class="max-h-[62vh] overflow-y-auto pr-0.5 space-y-3 pt-1">`;
+            let html = groupChips + `<div class="max-h-[65vh] overflow-y-auto pr-0.5 space-y-3 pt-1 pb-12">`;
             for (const [groupName, items] of Object.entries(grouped)) {
                 if (uiState.activeMasterGroup !== 'ALL' && uiState.activeMasterGroup !== groupName) continue;
 
-                // Cada grupo do Catálogo Master aceita drop de itens para mudar de categoria arrastando
                 html += `
                     <div class="master-group-container border border-zinc-200/80 rounded-xl bg-zinc-50/50 overflow-hidden transition-all"
                          ondragover="handleMasterGroupDragOver(event)"
@@ -1609,7 +2315,6 @@
                     html += `
                         <div class="${pillClasses}" style="${pillStyle}" draggable="true" ondragstart="handleDragStart(event, 'master', '${item.id}')" ondragend="handleDragEnd(event)">
                             <i class="fa-solid fa-grip-vertical ${alloc.isAllocated ? 'text-white/70' : 'text-zinc-300'} mr-1.5 text-[9px]"></i>
-                            <!-- Segurar em cima do nome abre a edição global do banco de dados -->
                             <span class="mr-1.5 select-none"
                                   title="Segure em cima do nome para renomear em todo o sistema"
                                   onmousedown="startMasterItemLongPress(event, '${item.id}')"
@@ -1619,7 +2324,6 @@
                                   ontouchend="clearMasterItemLongPress()"
                                   ontouchmove="clearMasterItemLongPress()"
                                   oncontextmenu="event.preventDefault(); clearMasterItemLongPress(); openEditProductNameModal('${item.name.replace(/'/g, "\\'")}')">${item.name}</span>
-                            <!-- Botão para mudar de categoria dentro do Catálogo Master -->
                             <button onclick="actionChangeMasterItemGroup('${item.id}')" title="Mudar de categoria no Catálogo Master" class="${alloc.isAllocated ? 'bg-black/20 hover:bg-black/40 text-white' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'} w-5 h-5 rounded-full flex items-center justify-center mr-0.5 transition"><i class="fa-solid fa-folder-open text-[9px]"></i></button>
                             <button onclick="actionMoveFromMasterToCat('${item.id}')" title="Alocar num fornecedor" class="${alloc.isAllocated ? 'bg-black/20 hover:bg-black/40 text-white' : 'bg-zinc-900 hover:bg-emerald-500 text-emerald-400 hover:text-white'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
                             <button onclick="actionDeleteMasterItem('${item.id}')" title="Excluir do catálogo" class="${alloc.isAllocated ? 'ml-0.5 text-white/75 hover:text-white' : 'ml-0.5 text-zinc-400 hover:text-rose-600'} w-5 h-5 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
@@ -1668,12 +2372,17 @@
             }
 
             let html = `
-                <div class="grid grid-cols-2 gap-2.5 mb-4 sticky top-0 bg-zinc-100/95 backdrop-blur-md pt-1 pb-2 z-10">
-                    <button onclick="actionCheckDiscrepancies(null)" class="bg-zinc-950 text-white py-3 px-4 rounded-xl font-extrabold shadow-sm hover:bg-zinc-800 flex items-center justify-center gap-2 text-xs transition">
-                        <i class="fa-solid fa-check-double text-emerald-400 text-sm"></i> FINALIZAR TUDO
-                    </button>
-                    <button onclick="actionSendWhatsApp(null)" class="bg-emerald-500 text-zinc-950 py-3 px-4 rounded-xl font-extrabold shadow-sm hover:bg-emerald-400 flex items-center justify-center gap-2 text-xs transition">
-                        <i class="fa-brands fa-whatsapp text-base"></i> WhatsApp Geral
+                <div class="space-y-2 mb-4 sticky top-0 bg-zinc-100/95 backdrop-blur-md pt-1 pb-2 z-10">
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button onclick="actionCheckDiscrepancies(null)" class="bg-zinc-950 text-white py-3 px-4 rounded-xl font-extrabold shadow-sm hover:bg-zinc-800 flex items-center justify-center gap-2 text-xs transition">
+                            <i class="fa-solid fa-check-double text-emerald-400 text-sm"></i> FINALIZAR TUDO
+                        </button>
+                        <button onclick="actionSendWhatsApp(null)" class="bg-emerald-500 text-zinc-950 py-3 px-4 rounded-xl font-extrabold shadow-sm hover:bg-emerald-400 flex items-center justify-center gap-2 text-xs transition">
+                            <i class="fa-brands fa-whatsapp text-base"></i> Enviar Link Geral
+                        </button>
+                    </div>
+                    <button onclick="actionCopyBuyerLink(null)" class="w-full bg-white border border-zinc-300 hover:border-zinc-900 text-zinc-800 py-2 px-3 rounded-xl font-bold text-[11px] flex items-center justify-center gap-2 transition shadow-2xs">
+                        <i class="fa-solid fa-link text-emerald-600"></i> Atualizar e Ver / Copiar Link Exclusivo do Comprador (Lista #${state.buyerPortal.listNumber || 1})
                     </button>
                 </div>
             `;
@@ -1695,7 +2404,7 @@
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-zinc-200 text-zinc-600">${checkedCount}/${catItems.length} conf.</span>
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <button onclick="actionSendWhatsApp('${cat.id}')" title="Enviar apenas ${cat.name} para WhatsApp" class="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition shadow-2xs">
+                                <button onclick="actionSendWhatsApp('${cat.id}')" title="Enviar Link de ${cat.name} para WhatsApp" class="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition shadow-2xs">
                                     <i class="fa-brands fa-whatsapp text-xs"></i> Enviar
                                 </button>
                                 <button onclick="actionCheckDiscrepancies('${cat.id}')" title="Finalizar entrega apenas de ${cat.name}" class="bg-zinc-950 hover:bg-zinc-800 text-white px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition shadow-2xs">
@@ -1749,6 +2458,7 @@
                 });
                 html += `</div></div>`;
             }
+            html += `<div class="h-16"></div>`;
             container.innerHTML = html;
         }
 
@@ -1991,6 +2701,7 @@
                     </div>
                 `;
             });
+            html += `<div class="h-16"></div>`;
             container.innerHTML = html;
         }
 
@@ -2029,24 +2740,25 @@
             renderNotas();
         }
 
+        // Envia no WhatsApp APENAS a mensagem explicativa + Link Interativo (sem a lista em texto)
         function actionSendWhatsApp(targetCatId = null) {
             const visibleItems = state.products.filter(p => p.qty > 0 && !p.pending && (!targetCatId || p.categoryId === targetCatId));
             if (visibleItems.length === 0) return;
 
-            const singleCat = targetCatId ? state.categories.find(c => c.id === targetCatId) : null;
-            let text = singleCat 
-                ? `*📋 PEDIDO - ${singleCat.name.toUpperCase()}*\n_Data: ${new Date().toLocaleDateString('pt-BR')}_\n\n`
-                : `*📋 CHEFSTOCK PRO*\n_Data: ${new Date().toLocaleDateString('pt-BR')}_\n\n`;
+            publishBuyerListSnapshot();
+            const buyerUrl = getBuyerLinkUrl(targetCatId);
+            const listNum = state.buyerPortal.listNumber || 1;
+            const dateStr = new Date().toLocaleDateString('pt-BR');
 
-            state.categories.sort((a,b) => a.order - b.order).forEach(cat => {
-                if (targetCatId && cat.id !== targetCatId) return;
-                const catItems = visibleItems.filter(p => p.categoryId === cat.id);
-                if (catItems.length > 0) {
-                    if (!singleCat) text += `*📍 ${cat.name.toUpperCase()}*\n`;
-                    catItems.forEach(prod => { text += `▫️ ${prod.qty} ${prod.type} - ${prod.name}${prod.urgent ? " 🚨" : ""}\n`; });
-                    text += "\n";
-                }
-            });
+            const singleCat = targetCatId ? state.categories.find(c => c.id === targetCatId) : null;
+            let text = '';
+
+            if (singleCat) {
+                text = `*📋 CHEFSTOCK PRO - LISTA #${listNum} (${singleCat.name.toUpperCase()})*\n_Data: ${dateStr}_\n\nOlá! A lista de compras de *${singleCat.name}* foi enviada.\n\n👉 *Clique no link abaixo para entrar na lista interativa e marcar os produtos conforme for comprando:*\n${buyerUrl}`;
+            } else {
+                text = `*📋 CHEFSTOCK PRO - LISTA DE COMPRAS #${listNum}*\n_Data: ${dateStr}_\n\nOlá! A lista de compras atualizada foi enviada.\n\n👉 *Clique no link abaixo para entrar na lista interativa e marcar os produtos conforme for comprando:*\n${buyerUrl}`;
+            }
+
             window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
         }
 
@@ -2167,6 +2879,7 @@
                     </div>
                 `;
             });
+            html += `<div class="h-16"></div>`;
             container.innerHTML = html;
             if (uiState.historySearch) {
                 const inp = document.getElementById('history-search-input');
